@@ -200,7 +200,10 @@
                         <span id="selection-count" class="font-semibold text-primary"></span>
                     </div>
                     <div class="flex items-center gap-2">
-                        
+                        <div class="flex items-center gap-2">
+                            <button id="download-selected-btn" class="p-2 rounded-full bg-tertiary-hover" title="Download Selected">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            </button>
                         <button id="copy-selected-btn" class="p-2 rounded-full bg-tertiary-hover" title="Copy Selected (Ctrl+C)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
                         <button id="move-selected-btn" class="p-2 rounded-full bg-tertiary-hover" title="Move Selected"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12H3"/><path d="m18 9 3 3-3 3"/><path d="M3 12a9 9 0 0 0 9 9 9 9 0 0 0 9-9 9 9 0 0 0-9-9 9 9 0 0 0-9 9Z"/></svg></button>
                         <button id="delete-selected-btn" class="p-2 rounded-full bg-tertiary-hover text-red-400" title="Delete Selected"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
@@ -272,7 +275,7 @@
     <div id="context-menu" class="hidden fixed bg-secondary border border-primary rounded-md shadow-lg py-1 z-50 text-sm"></div>
     
     <input type="file" id="file-upload-input" multiple><input type="file" id="folder-upload-input" webkitdirectory directory multiple><input type="file" id="pfp-upload-input" accept="image/*">
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script>
         (async function() {
             const $ = (selector) => document.querySelector(selector);
@@ -346,7 +349,59 @@
                 const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name: 'PBKDF2'}, false, ['deriveKey']);
                 sessionKey = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: saltBuffer, iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
             };
+            const downloadSelectedFiles = async () => {
+                const itemsToDownload = new Set(selectedItems);
+                if (itemsToDownload.size === 0) return;
 
+                showLoader();
+                try {
+                    const zip = new JSZip();
+                    // Fetch all user files once to build a map for quick lookups
+                    const allUserFiles = await dbGetAll('files', 'by_user_parent', IDBKeyRange.bound([currentUser, -Infinity], [currentUser, Infinity]));
+                    const fileMap = new Map(allUserFiles.map(file => [file.id, file]));
+
+                    const addItemsToZip = async (currentZipFolder, itemIds) => {
+                        for (const itemId of itemIds) {
+                            const item = fileMap.get(itemId);
+                            if (!item) continue;
+
+                            if (item.type.includes('folder')) {
+                                const newFolder = currentZipFolder.folder(item.name);
+                                const children = allUserFiles.filter(file => file.parentId === item.id);
+                                await addItemsToZip(newFolder, children.map(c => c.id));
+                            } else {
+                                let fileData = item.data;
+                                if (item.iv && item.data.byteLength > 0) {
+                                    fileData = await decryptData(item.data, item.iv);
+                                }
+                                // Only add file if data exists and could be decrypted
+                                if (fileData) {
+                                    currentZipFolder.file(item.name, fileData);
+                                }
+                            }
+                        }
+                    };
+
+                    await addItemsToZip(zip, itemsToDownload);
+
+                    const content = await zip.generateAsync({ type: "blob" });
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `PrivateDB_Download_${new Date().getTime()}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    showToast(`${itemsToDownload.size} item(s) zipped and downloaded.`);
+
+                } catch (error) {
+                    console.error("Error zipping files:", error);
+                    showToast("An error occurred during download.");
+                } finally {
+                    hideLoader();
+                }
+            };
             const encryptData = async (plainBuffer) => {
                 if (!sessionKey) throw new Error("Session key not available for encryption.");
                 const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -1075,15 +1130,29 @@
             };
 
             const renderGenericModal = (config) => {
-                const modalHTML = `<div id="${config.id}" class="fixed inset-0 flex items-center justify-center modal"><div class="bg-secondary rounded-lg shadow-xl p-6 w-full ${config.size || 'max-w-sm'}"><h3 class="text-lg font-bold mb-4 text-primary">${config.title}</h3>${config.body ? `<div class="text-sm text-secondary mb-4">${config.body}</div>` : ''}<form id="${config.id}-form">${config.formBody || ''}<div class="mt-4 flex justify-end gap-2">${config.hideCancel ? '' : '<button type="button" class="modal-cancel-btn px-4 py-2 bg-tertiary bg-tertiary-hover rounded-md text-primary">Cancel</button>'}${config.hideConfirm ? '' : `<button type="submit" class="px-4 py-2 rounded-md ${config.isDestructive ? 'destructive-primary destructive-hover' : 'accent-primary accent-hover'}">${config.confirmText}</button>`}</div></form></div></div>`;
-                $('#generic-modal-container').innerHTML = modalHTML;
-                const form = $(`#${config.id}-form`);
-                openModal($(`#${config.id}`));
-                form.onsubmit = (e) => { e.preventDefault(); config.onSubmit(e); };
-                $$('.modal-cancel-btn').forEach(btn => btn.onclick = closeModal);
-                const input = form.querySelector('input');
-                if(input) input.focus();
-            };
+    const modalHTML = `<div id="${config.id}" class="fixed inset-0 flex items-center justify-center modal"><div class="bg-secondary rounded-lg shadow-xl p-6 w-full ${config.size || 'max-w-sm'}"><h3 class="text-lg font-bold mb-4 text-primary">${config.title}</h3>${config.body ? `<div class="text-sm text-secondary mb-4">${config.body}</div>` : ''}<form id="${config.id}-form">${config.formBody || ''}<div class="mt-4 flex justify-end gap-2">${config.hideCancel ? '' : '<button type="button" class="modal-cancel-btn px-4 py-2 bg-tertiary bg-tertiary-hover rounded-md text-primary">Cancel</button>'}${config.hideConfirm ? '' : `<button type="submit" class="px-4 py-2 rounded-md ${config.isDestructive ? 'destructive-primary destructive-hover' : 'accent-primary accent-hover'}">${config.confirmText}</button>`}</div></form></div></div>`;
+    $('#generic-modal-container').innerHTML = modalHTML;
+    const form = $(`#${config.id}-form`);
+    openModal($(`#${config.id}`));
+    form.onsubmit = (e) => { e.preventDefault(); config.onSubmit(e); };
+
+    // This block adds "Enter" key support
+    form.onkeydown = (e) => {
+        // Ignore textareas, where Enter should create a new line
+        if (e.target.tagName.toLowerCase() === 'textarea') {
+            return;
+        }
+        // For all other inputs, trigger submit on Enter
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+    };
+
+    $$('.modal-cancel-btn').forEach(btn => btn.onclick = closeModal);
+    const input = form.querySelector('input');
+    if(input) input.focus();
+};
 
             const showNewFileModal = (type, defaultName) => {
                 renderGenericModal({
@@ -1112,7 +1181,10 @@
                 });
                 setTimeout(() => $('#modal-input').select(), 100);
             };
+// This function defines the "cancel" action
 
+            window.closeModal = closeModal; // Add this line
+         
             const createWizard = (config) => {
                 let currentStep = 0;
                 let wizardState = {};
@@ -1121,6 +1193,7 @@
                     <button type="button" id="wizard-back-btn" class="p-2 rounded-full bg-tertiary-hover" title="Back">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                     </button>
+                    <button type="button" id="cancelButton" class="cancel-btn" onclick="closeModal()">Cancel</button>
                     <button type="submit" class="p-2 rounded-full accent-primary accent-hover" title="Next">
                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
                     </button>
@@ -1155,7 +1228,7 @@
                 const wizardModal = $(`#${config.id}`);
                 const backButton = wizardModal.querySelector('#wizard-back-btn');
                 const form = wizardModal.querySelector('form');
-                form.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.dispatchEvent(new Event('submit')); } };
+                
                 
                 backButton.onclick = () => {
                     if (currentStep > 0) {
@@ -1548,6 +1621,7 @@
                 $('#change-password-start-btn').onclick = showChangePasswordWizard;
                 $('#change-username-start-btn').onclick = showChangeUsernameWizard;
                 $('#selection-done-btn').onclick = exitSelectionMode;
+                $('#download-selected-btn').onclick = downloadSelectedFiles;
                 $('#delete-selected-btn').onclick = deleteItems;
                 $('#move-selected-btn').onclick = showMoveModal;
                 $('#copy-selected-btn').onclick = copyItems;
