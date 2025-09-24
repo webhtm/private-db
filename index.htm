@@ -1,0 +1,1722 @@
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrivateDB - Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link id="manifest-link" rel="manifest">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        :root {
+            --bg-primary: #111827; --bg-secondary: #1f2937; --bg-tertiary: #374151;
+            --border-primary: #4b5563; --text-primary: #f3f4f6; --text-secondary: #9ca3af;
+            --accent-primary: #3b82f6; --accent-hover: #2563eb; --destructive: #ef4444;
+            --accent-primary-rgb: 59, 130, 246;
+            --bg-tertiary-hover: #4b5563; --bg-tertiary-active: #3b82f6;
+        }
+        html.light {
+            --bg-primary: #f9fafb; --bg-secondary: #ffffff; --bg-tertiary: #f3f4f6;
+            --border-primary: #d1d5db; --text-primary: #1f2937; --text-secondary: #6b7280;
+            --bg-tertiary-hover: #e5e7eb; --bg-tertiary-active: #dbeafe;
+        }
+        .bg-primary { background-color: var(--bg-primary); } .bg-secondary { background-color: var(--bg-secondary); }
+        .bg-tertiary { background-color: var(--bg-tertiary); } .text-primary { color: var(--text-primary); }
+        .text-secondary { color: var(--text-secondary); } .border-primary { border-color: var(--border-primary); }
+        .accent-primary { background-color: var(--accent-primary); color: white; }
+        .accent-hover:hover { background-color: var(--accent-hover); }
+        .destructive-primary { background-color: var(--destructive); color: white; }
+        .destructive-hover:hover { background-color: #dc2626; }
+        .bg-tertiary-hover:hover { background-color: var(--bg-tertiary-hover); }
+        .settings-nav-item.active { background-color: var(--bg-tertiary-active); color: white; font-weight: 600; }
+        html.light .settings-nav-item.active { color: var(--accent-primary); }
+        .settings-nav-item.active:hover { background-color: var(--bg-tertiary-active); }
+        .theme-btn.active { background-color: var(--accent-primary); color: white; }
+        
+        /* Scrollbar Base Styles */
+        ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-primary); border-radius: 10px; }
+
+        /* Hide scrollbar for account list */
+        #user-profiles-list::-webkit-scrollbar { display: none; }
+        #user-profiles-list { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .file-item.selected, .list-item.selected { 
+            background-color: rgba(var(--accent-primary-rgb), 0.3) !important;
+            border-color: rgba(var(--accent-primary-rgb), 0.7) !important;
+        }
+
+        .file-item.drag-over, .list-item.drag-over {
+            border-style: dashed !important;
+            border-color: var(--accent-primary) !important;
+            transform: scale(1.03);
+        }
+
+        #auth-screen-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 28rem;
+        }
+
+        #user-profiles-container {
+            width: 100%;
+            position: relative;
+            max-height: calc(100vh - 250px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        #user-profiles-list {
+            overflow-y: auto;
+            flex-grow: 1;
+            padding-right: 15px;
+            margin-right: -15px;
+        }
+        
+        #add-account-button-container {
+            flex-shrink: 0;
+            padding-top: 1rem;
+            width: 100%;
+        }
+
+        #settings-sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+
+        @media (max-width: 767px) {
+            #settings-sidebar {
+                position: absolute;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                height: 100%;
+                z-index: 50;
+                transform: translateX(-100%);
+                background-color: var(--bg-secondary);
+                padding: 1rem;
+                width: 256px;
+                border-right: 1px solid var(--border-primary);
+            }
+            #settings-sidebar.open {
+                transform: translateX(0);
+            }
+            #settings-content-container {
+                margin-left: 0;
+            }
+        }
+
+        input[type="file"] { display: none; }
+        #toast { z-index: 110; }
+        #loading-overlay { z-index: 100; }
+        #settings-screen { z-index: 60; }
+        #fullscreen-viewer { z-index: 60; }
+        .modal-backdrop { z-index: 70; }
+        .modal { z-index: 80; }
+        .no-ring-on-focus:focus { outline: none; box-shadow: none; ring-width: 0; }
+        [contenteditable]:focus { outline: 2px solid var(--accent-primary); border-radius: 4px; }
+        .wizard-step { display: none; } .wizard-step.active { display: block; }
+        .selection-active .file-item, .selection-active .list-item { cursor: pointer !important; }
+
+        #path-container { background-color: transparent; }
+        .user-profile-button {
+            height: 4rem;
+            transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+        }
+        .user-profile-button:hover {
+            transform: scale(1.03);
+            background-color: var(--bg-tertiary);
+        }
+        .truncate-username {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-name-truncate {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            word-break: break-all;
+            line-height: 1.25;
+            max-height: 2.5em;
+        }
+        input[type="color"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 40px; height: 40px; padding: 0;
+            border: none; border-radius: 50%; cursor: pointer;
+            background-color: transparent;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border-radius: 50%;
+            border: 2px solid var(--border-primary);
+        }
+    </style>
+</head>
+<body class="bg-primary text-primary antialiased transition-colors duration-300 overflow-hidden">
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center hidden">
+        <svg class="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+    </div>
+
+    <div id="app" class="h-screen w-screen flex flex-col">
+        <div id="auth-screen" class="flex flex-col items-center justify-center h-full w-full p-4 relative">
+             <div id="auth-screen-content">
+                <h1 class="text-4xl md:text-5xl font-bold text-primary mb-12 flex-shrink-0">PrivateDB</h1>
+                <div id="user-profiles-container">
+                    <div id="user-profiles-list" class="space-y-4"></div>
+                </div>
+                <div id="add-account-button-container" class="flex-shrink-0"></div>
+            </div>
+            <div id="auth-theme-toggle" class="absolute bottom-5 left-5 rounded-lg bg-tertiary p-1 flex w-fit">
+                <button id="auth-theme-dark-btn" class="theme-btn px-3 py-1.5 rounded-md text-sm font-medium">Dark</button>
+                <button id="auth-theme-light-btn" class="theme-btn px-3 py-1.5 rounded-md text-sm font-medium">Light</button>
+            </div>
+        </div>
+        <div id="password-modal" class="hidden fixed inset-0 flex items-center justify-center modal"><div class="bg-secondary rounded-lg shadow-xl p-8 w-full max-w-sm text-center"><img id="password-modal-pfp" class="w-24 h-24 rounded-full mx-auto mb-4 object-cover" src="" alt="Profile Picture"><h3 id="password-modal-username" class="text-xl font-bold mb-4 text-primary truncate-username"></h3><form id="password-form" class="space-y-4"><input type="password" id="password-input" placeholder="Password" class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required><button type="submit" class="w-full accent-primary accent-hover font-bold py-2 px-4 rounded-md transition duration-150">Enter</button><p id="password-error" class="text-red-400 text-sm h-4"></p></form><button type="button" class="modal-cancel-btn mt-4 text-sm text-secondary hover:underline">Cancel</button></div></div>
+        <div id="create-account-modal" class="hidden fixed inset-0 flex items-center justify-center modal"><div class="bg-secondary rounded-lg shadow-xl p-8 w-full max-w-sm"><h3 class="text-xl font-bold mb-4 text-primary text-center">Create New Account</h3><form id="signup-form" class="space-y-4"><div><label for="signup-username" class="block text-sm font-medium text-secondary">Username</label><input type="text" id="signup-username" required class="mt-1 block w-full bg-tertiary border border-primary rounded-md shadow-sm py-2 px-3 text-primary no-ring-on-focus"></div><div><label for="signup-password" class="block text-sm font-medium text-secondary">Password</label><input type="password" id="signup-password" required class="mt-1 block w-full bg-tertiary border border-primary rounded-md shadow-sm py-2 px-3 text-primary no-ring-on-focus"></div><button type="submit" class="w-full accent-primary accent-hover font-bold py-2 px-4 rounded-md transition duration-150">Create Account</button><p id="signup-error" class="text-red-400 text-sm text-center h-4"></p></form><div class="text-center mt-4"><button type="button" class="modal-cancel-btn text-sm text-secondary hover:underline">Cancel</button></div></div></div>
+
+        <div id="main-drive" class="hidden h-full w-full flex flex-col p-2 md:p-4 gap-2 md:gap-4">
+            <header class="bg-secondary rounded-lg p-2 flex items-center gap-2 md:gap-4 flex-wrap relative">
+                <div id="default-header" class="flex items-center gap-2 md:gap-4 flex-grow w-full">
+                    <div class="flex items-center gap-2"><button id="back-btn" title="Back" class="p-2 rounded-md bg-tertiary-hover transition disabled:opacity-50 disabled:cursor-not-allowed text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button><button id="forward-btn" title="Forward" class="p-2 rounded-md bg-tertiary-hover transition disabled:opacity-50 disabled:cursor-not-allowed text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div>
+                    <div id="path-container" class="flex-grow rounded-md p-2 text-sm flex items-center overflow-hidden min-w-0"><div id="path-bar" class="flex items-center overflow-x-auto whitespace-nowrap w-full"></div></div>
+                    <div class="flex items-center gap-2 md:gap-4 ml-auto">
+                        <button id="search-btn" title="Search" class="p-2 rounded-md bg-tertiary-hover transition text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+                        <button id="view-toggle-btn" title="Toggle View" class="p-2 rounded-md bg-tertiary-hover transition text-primary hidden md:flex"><svg id="view-grid-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg><svg id="view-list-icon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg></button>
+                        <button id="settings-btn" title="Settings" class="p-2 rounded-md bg-tertiary-hover transition text-primary hidden md:flex"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+                        <button id="more-options-btn" title="More Options" class="p-2 rounded-md bg-tertiary-hover transition text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+                        <button id="logout-btn-header" title="Logout" class="p-2 rounded-md bg-tertiary-hover transition text-red-400 hover:text-red-300 hidden md:flex"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+                    </div>
+                </div>
+                <div id="selection-header" class="hidden w-full flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <button id="selection-done-btn" title="Done" class="p-2 rounded-full bg-tertiary-hover"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                        <span id="selection-count" class="font-semibold text-primary"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        
+                        <button id="copy-selected-btn" class="p-2 rounded-full bg-tertiary-hover" title="Copy Selected (Ctrl+C)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+                        <button id="move-selected-btn" class="p-2 rounded-full bg-tertiary-hover" title="Move Selected"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12H3"/><path d="m18 9 3 3-3 3"/><path d="M3 12a9 9 0 0 0 9 9 9 9 0 0 0 9-9 9 9 0 0 0-9-9 9 9 0 0 0-9 9Z"/></svg></button>
+                        <button id="delete-selected-btn" class="p-2 rounded-full bg-tertiary-hover text-red-400" title="Delete Selected"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                    </div>
+                </div>
+            </header>
+            <main class="flex-grow flex bg-secondary rounded-lg p-4 overflow-hidden"><div id="file-browser" class="w-full h-full overflow-y-auto"><div id="file-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4"></div><div id="file-list" class="hidden"><div class="grid grid-cols-12 gap-4 px-4 py-2 text-secondary text-sm font-semibold border-b border-primary"><div class="col-span-6">Name</div><div class="col-span-3">Last Modified</div><div class="col-span-3">File Size</div></div><div id="list-items-container"></div></div><div id="empty-folder-message" class="hidden h-full flex items-center justify-center"><div class="text-center text-secondary"><svg class="mx-auto h-16 w-16" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg><p class="mt-2 text-lg font-semibold text-primary">This folder is empty</p><p class="text-sm">Use the '+' button or right-click to add items.</p></div></div></div></main>
+        </div>
+    </div>
+    
+    <div id="toast" class="fixed bottom-5 right-5 bg-tertiary text-primary py-2 px-4 rounded-lg shadow-lg opacity-0 transform translate-y-2 transition-all duration-300"><p id="toast-message"></p></div>
+    <div id="modal-backdrop" class="fixed inset-0 bg-black bg-opacity-50 hidden modal-backdrop"></div>
+    
+    <div id="settings-screen" class="hidden fixed inset-0 bg-primary/80 backdrop-blur-sm p-4">
+        <div class="w-full h-full max-w-6xl max-h-[90vh] bg-secondary rounded-lg shadow-2xl flex flex-col md:flex-row gap-4 overflow-hidden relative">
+            <header class="flex md:hidden items-center justify-between p-4 border-b border-primary">
+                <div class="flex items-center gap-2">
+                    <button id="settings-sidebar-toggle" class="p-2 rounded-full bg-tertiary-hover">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+                    </button>
+                    <h2 class="text-lg font-bold text-primary">Settings</h2>
+                </div>
+                <button id="settings-close-btn-mobile" class="p-2 rounded-full bg-tertiary-hover">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </header>
+            
+            <div id="settings-sidebar" class="flex-shrink-0 md:w-64 flex flex-col gap-4 md:p-4">
+                 <div class="flex items-center gap-3">
+                    <img id="settings-pfp-header" class="w-12 h-12 rounded-full object-cover" src="">
+                    <div>
+                        <h2 id="settings-username-header" class="text-lg font-bold text-primary truncate-username"></h2>
+                        <p class="text-sm text-secondary">Account Settings</p>
+                    </div>
+                </div>
+                <nav class="space-y-2 flex-grow overflow-y-auto">
+                    <a href="#" data-section="profile" class="settings-nav-item flex items-center gap-3 p-2 rounded-md bg-tertiary-hover"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>Profile</a>
+                    <a href="#" data-section="appearance" class="settings-nav-item flex items-center gap-3 p-2 rounded-md bg-tertiary-hover"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 1 0 10 10"/><path d="M12 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z"/></svg>Appearance</a>
+                    <a href="#" data-section="security" class="settings-nav-item flex items-center gap-3 p-2 rounded-md bg-tertiary-hover"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Security</a>
+                    <a href="#" data-section="data" class="settings-nav-item flex items-center gap-3 p-2 rounded-md bg-tertiary-hover"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Data</a>
+                </nav>
+                <footer class="border-t border-primary pt-4 hidden md:block">
+                     <button id="logout-btn" class="w-full flex items-center justify-center gap-2 text-red-400 hover:bg-red-500/10 p-2 rounded-md transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout</button>
+                </footer>
+            </div>
+
+            <button id="settings-close-btn" class="absolute top-3 right-3 p-2 rounded-full bg-tertiary-hover hidden md:flex">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <main id="settings-content-container" class="flex-grow bg-primary p-4 rounded-md overflow-y-auto flex flex-col items-center">
+                <div id="settings-section-profile" class="settings-section space-y-6 w-full max-w-lg">
+                    <h3 class="text-lg font-bold text-primary mb-4">Profile Settings</h3>
+                    <div><label class="block text-md font-semibold text-primary">Profile Picture</label><div class="flex items-center gap-4 mt-2"><img id="settings-pfp-preview" class="w-16 h-16 rounded-full object-cover bg-tertiary" src=""><div class="flex flex-col gap-2"><button id="upload-pfp-btn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md text-white text-sm">Upload</button><button id="remove-pfp-btn" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-md text-white text-sm">Remove</button></div></div></div>
+                    <div><label class="block text-md font-semibold text-primary">Change Username</label><p class="text-sm text-secondary mb-2">Update your login username. This action will require you to re-login.</p><button id="change-username-start-btn" class="accent-primary accent-hover px-4 py-2 rounded-md text-sm">Change Username</button></div>
+                    <div class="border-t border-primary my-4"></div>
+                    <div><label class="block text-md font-semibold text-red-400">Delete Account</label><p class="text-sm text-secondary mb-2">Permanently delete your account and all associated data. This action cannot be undone.</p><button id="delete-account-btn" class="destructive-primary destructive-hover px-4 py-2 rounded-md text-sm">Delete My Account</button></div>
+                </div>
+                <div id="settings-section-appearance" class="settings-section hidden space-y-6 w-full max-w-lg"><h3 class="text-lg font-bold text-primary mb-4">Appearance</h3><div><label class="block text-md font-semibold text-primary">Theme</label><div class="mt-2 rounded-lg bg-tertiary p-1 flex w-fit"><button id="theme-dark-btn" class="theme-btn px-4 py-1.5 rounded-md text-sm font-medium">Dark</button><button id="theme-light-btn" class="theme-btn px-4 py-1.5 rounded-md text-sm font-medium">Light</button></div></div></div>
+                <div id="settings-section-security" class="settings-section hidden space-y-6 w-full max-w-lg"><h3 class="text-lg font-bold text-primary mb-4">Security</h3><div><label class="block text-md font-semibold text-primary">Change Password</label><p class="text-sm text-secondary mb-2">Update your password.</p><button id="change-password-start-btn" class="accent-primary accent-hover px-4 py-2 rounded-md text-sm">Change Password</button></div></div>
+                <div id="settings-section-data" class="settings-section hidden space-y-6 w-full max-w-lg"><h3 class="text-lg font-bold text-primary mb-4">Data Management</h3><div><label class="block text-md font-semibold text-primary">Delete All Files</label><p class="text-sm text-secondary mb-2">Permanently delete all of your files and folders. This action cannot be undone.</p><button id="delete-all-files-btn" class="destructive-primary destructive-hover px-4 py-2 rounded-md text-sm">Delete All My Files</button></div></div>
+            </main>
+        </div>
+    </div>
+
+    <div id="fullscreen-viewer" class="hidden fixed inset-0 bg-primary flex flex-col"></div>
+
+    <div id="search-modal" class="hidden fixed inset-0 bg-primary p-4 modal"><div class="max-w-3xl mx-auto"><div class="flex items-center gap-4 mb-4"><input type="search" id="search-modal-input" placeholder="Search all files..." class="w-full bg-secondary border-primary rounded-md py-2 px-3 text-base no-ring-on-focus border text-primary"><button class="modal-cancel-btn p-2 rounded-md bg-tertiary-hover">Close</button></div><div id="search-results" class="overflow-y-auto" style="max-height: calc(100vh - 100px);"></div></div></div>
+    <div id="generic-modal-container"></div>
+    <div id="context-menu" class="hidden fixed bg-secondary border border-primary rounded-md shadow-lg py-1 z-50 text-sm"></div>
+    
+    <input type="file" id="file-upload-input" multiple><input type="file" id="folder-upload-input" webkitdirectory directory multiple><input type="file" id="pfp-upload-input" accept="image/*">
+
+    <script>
+        (async function() {
+            const $ = (selector) => document.querySelector(selector);
+            const $$ = (selector) => document.querySelectorAll(selector);
+
+            let db, currentUser = null, currentSettings = {}, currentFolderId = 0, navigationHistory = [0], historyIndex = 0, longPressTimer, mousePressTimer, sessionKey = null;
+            let selectedItems = new Set();
+            let clipboard = { items: new Set(), operation: null };
+            let isSelectionModeActive = false;
+            let contextMenuJustOpened = false;
+            const DB_NAME = 'userDriveDB_v10', DB_VERSION = 10;
+            const DEFAULT_PFP_SVG = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZHRoPSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjgiIHI9IjUiLz48cGF0aCBkPSJNMjAgMjFhOCA4IDAgMCAwLTE2IDAiLz48L3N2Zz4=`;
+            const modalBackdrop = $('#modal-backdrop');
+
+            // --- PWA & Offline Support ---
+            const manifest = {
+                "name": "PrivateDB",
+                "short_name": "PrivateDB",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#111827",
+                "theme_color": "#111827",
+                "icons": [{"src":"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZHRoPSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjIgMTlhMiAyIDAgMCAxLTIgMnAtNCA0IDAgMCAxLTQgNEgtOGE0IDQgMCAwIDEtNC00di0zYTEgMSAwIDAgMSAxLTFoM2ExIDEgMCAwIDEgMSAxdjNhMSAxIDAgMCAwIDEgMWg0YTEgMSAwIDAgMCAxLTF2LTEwSDdhMSAxIDAgMCAwLTEgMXYyYTEgMSAwIDAgMS0xIDFIM2ExIDEgMCAwIDEtMS0xVjhhNCA0IDAgMCAxIDQtNEgyMGEyIDIgMCAwIDEgMiAydjExWiIvPjwvc3ZnPg==","sizes":"192x192","type":"image/svg+xml"}]
+            };
+            const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+            $('#manifest-link').href = URL.createObjectURL(manifestBlob);
+            
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    const CACHE_NAME = 'privatedb-cache-v1';
+                    const urlsToCache = [
+                        '/', 
+                        'https://cdn.tailwindcss.com',
+                        'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+                        'https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7.woff2'
+                    ];
+                    self.addEventListener('install', event => {
+                        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)));
+                    });
+                    self.addEventListener('fetch', event => {
+                        event.respondWith(
+                            caches.match(event.request).then(response => response || fetch(event.request))
+                        );
+                    });
+                `;
+                const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.error('Service Worker registration failed:', err));
+            }
+
+            const showToast = (message) => { $('#toast-message').textContent = message; const t = $('#toast'); t.classList.remove('opacity-0','translate-y-2'); setTimeout(()=>t.classList.add('opacity-0','translate-y-2'), 3000); };
+            const showLoader = () => $('#loading-overlay').classList.remove('hidden');
+            const hideLoader = () => $('#loading-overlay').classList.add('hidden');
+            const openModal = (modal) => { modalBackdrop.classList.remove('hidden'); modal.classList.remove('hidden'); };
+            const closeModal = () => { modalBackdrop.classList.add('hidden'); $$('.modal').forEach(m=>m.classList.add('hidden')); $('#generic-modal-container').innerHTML = ''; };
+            const openSettings = () => { $('#settings-screen').classList.remove('hidden'); };
+            const closeSettings = () => { $('#settings-screen').classList.add('hidden'); $('#settings-sidebar').classList.remove('open');};
+            const formatBytes = (b,d=2) => {if(!b||b===0)return'0 Bytes';const k=1024,i=Math.floor(Math.log(b)/Math.log(k));return`${parseFloat((b/Math.pow(k,i)).toFixed(d<0?0:d))} ${['Bytes','KB','MB','GB','TB'][i]}`};
+            
+            async function hashPassword(p,s){const e=new TextEncoder(),k=await crypto.subtle.importKey('raw',e.encode(p),{name:'PBKDF2'},!1,['deriveBits']),h=await crypto.subtle.deriveBits({name:'PBKDF2',salt:s,iterations:100000,hash:'SHA-256'},k,256);return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+            function generateSalt(){return crypto.getRandomValues(new Uint8Array(16))}
+            function hexToBuffer(h){const b=new Uint8Array(h.length/2);for(let i=0;i<h.length;i+=2)b[i/2]=parseInt(h.substr(i,2),16);return b}
+            function bufferToHex(b) { return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+
+            const deriveSessionKey = async (password, saltBuffer) => {
+                const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name: 'PBKDF2'}, false, ['deriveKey']);
+                sessionKey = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: saltBuffer, iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+            };
+
+            const encryptData = async (plainBuffer) => {
+                if (!sessionKey) throw new Error("Session key not available for encryption.");
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, sessionKey, plainBuffer);
+                return { ciphertext, iv: bufferToHex(iv) };
+            };
+
+            const decryptData = async (cipherBuffer, ivHex) => {
+                if (!sessionKey) throw new Error("Session key not available for decryption.");
+                const iv = hexToBuffer(ivHex);
+                try {
+                    return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, sessionKey, cipherBuffer);
+                } catch (e) {
+                    console.error("Decryption failed:", e);
+                    showToast("Error: Could not decrypt file. It might be corrupted or from an older, unencrypted version.");
+                    return null;
+                }
+            };
+
+            const initDB = () => new Promise((resolve, reject) => {
+                const r = indexedDB.open(DB_NAME, DB_VERSION);
+                r.onerror = e => reject(`DB error: ${e.target.error}`);
+                r.onupgradeneeded = e => {
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains('users')) d.createObjectStore('users', { keyPath: 'username' });
+                    if (!d.objectStoreNames.contains('files')) { const f = d.createObjectStore('files', { keyPath: 'id', autoIncrement: true }); f.createIndex('by_user_parent', ['userId', 'parentId']); }
+                    if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'userId' });
+                    if (d.objectStoreNames.contains('shares')) d.deleteObjectStore('shares');
+                };
+                r.onsuccess = e => { db = e.target.result; resolve(db); };
+            });
+            const dbGet = (store, key) => new Promise(r => db.transaction(store).objectStore(store).get(key).onsuccess = e => r(e.target.result));
+            const dbGetAll = (store, indexName, query) => new Promise(r => { const s = db.transaction(store).objectStore(store); (indexName ? s.index(indexName) : s).getAll(query).onsuccess = e => r(e.target.result); });
+            const dbPut = (store, data) => new Promise((res, rej) => { const t = db.transaction(store, 'readwrite'); t.objectStore(store).put(data); t.oncomplete = res; t.onerror = rej; });
+            const dbAdd = (store, data) => new Promise((res, rej) => { const t = db.transaction(store, 'readwrite'); t.objectStore(store).add(data).onsuccess = (e) => res(e.target.result); t.onerror = rej; });
+            const dbDelete = (store, key) => new Promise((res, rej) => { const t = db.transaction(store, 'readwrite'); t.objectStore(store).delete(key); t.oncomplete = res; t.onerror = rej; });
+            
+            const applySettings = (settings) => {
+                currentSettings = settings;
+                document.documentElement.classList.toggle('light', settings.theme === 'light');
+                document.documentElement.classList.toggle('dark', settings.theme === 'dark');
+                $('#theme-dark-btn').classList.toggle('active', settings.theme === 'dark');
+                $('#theme-light-btn').classList.toggle('active', settings.theme === 'light');
+                const isGrid = settings.view === 'grid';
+                $('#file-grid').classList.toggle('hidden', !isGrid);
+                $('#file-list').classList.toggle('hidden', isGrid);
+                $('#view-grid-icon').classList.toggle('hidden', !isGrid);
+                $('#view-list-icon').classList.toggle('hidden', isGrid);
+            };
+
+            const updateSettings = async (newSettings) => { const updated = { ...currentSettings, ...newSettings }; await dbPut('settings', updated); applySettings(updated); return updated; };
+            const prepareSettingsPanel = async () => {
+                const pfpSrc = currentSettings.pfp || DEFAULT_PFP_SVG;
+                $('#settings-pfp-header').src = pfpSrc;
+                $('#settings-username-header').textContent = currentUser;
+                $('#settings-pfp-preview').src = pfpSrc;
+                $('.settings-nav-item[data-section="profile"]').click();
+                openSettings();
+            };
+            
+            const renderAuthScreen = async () => {
+                document.title = 'PrivateDB - Login';
+                document.documentElement.classList.add('dark');
+                document.documentElement.classList.remove('light');
+                $('#auth-theme-dark-btn').classList.add('active');
+                $('#auth-theme-light-btn').classList.remove('active');
+
+                showLoader();
+                const users = await dbGetAll('users');
+                const list = $('#user-profiles-list');
+                const addAccountContainer = $('#add-account-button-container');
+                list.innerHTML = '';
+                addAccountContainer.innerHTML = '';
+                
+                for (const user of users) {
+                    const settings = await dbGet('settings', user.username) || {};
+                    const pfpSrc = settings.pfp || DEFAULT_PFP_SVG;
+                    const profile = document.createElement('div');
+                    profile.className = 'user-profile-button flex items-center gap-4 p-3 bg-secondary rounded-lg cursor-pointer';
+                    profile.innerHTML = `<img src="${pfpSrc}" alt="${user.username}" class="w-10 h-10 rounded-full object-cover flex-shrink-0"><span class="text-xl font-medium text-primary truncate-username">${user.username}</span>`;
+                    profile.onclick = () => showPasswordModal(user.username, pfpSrc);
+                    list.appendChild(profile);
+                }
+
+                const addProfile = document.createElement('div');
+                addProfile.className = 'user-profile-button flex items-center gap-4 p-3 bg-secondary rounded-lg cursor-pointer';
+                addProfile.innerHTML = `<div class="w-10 h-10 rounded-full flex items-center justify-center bg-tertiary flex-shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-secondary"><path d="M5 12h14"/><path d="M12 5v14"/></svg></div><span class="text-xl font-medium text-primary">Add Account</span>`;
+                addProfile.onclick = () => { $('#signup-form').reset(); $('#signup-error').textContent = ''; openModal($('#create-account-modal')); };
+                addAccountContainer.appendChild(addProfile);
+
+                hideLoader();
+                $('#auth-screen').classList.remove('hidden');
+                $('#main-drive').classList.add('hidden');
+            };
+
+            const showPasswordModal = (username, pfpSrc) => {
+                $('#password-modal-pfp').src = pfpSrc; $('#password-modal-username').textContent = username;
+                $('#password-form').dataset.username = username; $('#password-input').value = ''; $('#password-error').textContent = '';
+                openModal($('#password-modal')); $('#password-input').focus();
+            };
+
+            const handleLogin = async (e) => {
+                e.preventDefault(); showLoader();
+                const username = e.target.dataset.username; const password = $('#password-input').value;
+                const user = await dbGet('users', username);
+                if (user) {
+                    const saltBuffer = hexToBuffer(user.salt);
+                    const passwordHash = await hashPassword(password, saltBuffer);
+                    if (passwordHash === user.passwordHash) {
+                        await deriveSessionKey(password, saltBuffer);
+                        currentUser = user.username;
+                        document.title = `PrivateDB - ${currentUser}`;
+                        const settings = await dbGet('settings', currentUser) || { userId: currentUser, theme: 'dark', view: 'grid' };
+                        if (!settings.userId) settings.userId = currentUser;
+                        await dbPut('settings', settings);
+                        applySettings(settings);
+                        closeModal();
+                        $('#main-drive').classList.remove('hidden');
+                        $('#auth-screen').classList.add('hidden');
+                        await renderFileSystem(0);
+                    } else { 
+                        $('#password-error').textContent = 'Incorrect password.';
+                        $('#password-input').value = '';
+                    }
+                }
+                hideLoader();
+            };
+            
+            const handleSignup = async (e) => {
+                e.preventDefault(); showLoader();
+                const username = $('#signup-username').value.trim(); const password = $('#signup-password').value;
+                const errorEl = $('#signup-error');
+                if (!username || !password) { errorEl.textContent = 'All fields are required.'; hideLoader(); return; }
+                if (await dbGet('users', username)) { errorEl.textContent = 'Username already exists.'; hideLoader(); return; }
+                const salt = generateSalt();
+                const passwordHash = await hashPassword(password, salt);
+                await dbAdd('users', { username, passwordHash, salt: bufferToHex(salt) });
+                await dbAdd('settings', { userId: username, theme: 'dark', view: 'grid', pfp: null });
+                hideLoader(); closeModal(); showToast(`Account for ${username} created!`); await renderAuthScreen();
+            };
+            
+            const handleLogout = () => { currentUser = null; sessionKey = null; currentSettings = {}; currentFolderId = 0; navigationHistory = [0]; historyIndex = 0; selectedItems.clear(); clipboard = { items: new Set(), operation: null }; closeModal(); closeSettings(); hideContextMenu(); $('#fullscreen-viewer').classList.add('hidden'); renderAuthScreen(); };
+            
+            const renderFileSystem = async (folderId) => {
+                currentFolderId = folderId;
+                await renderPathBar(folderId);
+                const items = await dbGetAll('files', 'by_user_parent', [currentUser, folderId]);
+                
+                items.sort((a,b) => {
+                    if (a.type.includes('folder') && !b.type.includes('folder')) return -1;
+                    if (!a.type.includes('folder') && b.type.includes('folder')) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+                const gridContainer = $('#file-grid');
+                const listContainer = $('#list-items-container');
+                gridContainer.innerHTML = ''; listContainer.innerHTML = '';
+                
+                $('#empty-folder-message').classList.toggle('hidden', items.length > 0);
+                items.forEach(item => { 
+                    const { gridItem, listItem } = createFileElement(item); 
+                    gridContainer.appendChild(gridItem);
+                    listContainer.appendChild(listItem); 
+                });
+                
+                exitSelectionMode();
+            };
+
+            const getPath = async (folderId) => {
+                if (folderId <= 0) {
+                    return [{ id: 0, name: 'My Drive' }];
+                }
+                let path = []; let currentId = folderId;
+                while(currentId !== 0) { 
+                    const item = await dbGet('files', currentId); 
+                    if (!item) break; 
+                    path.unshift({ id: item.id, name: item.name }); 
+                    currentId = item.parentId; 
+                }
+                path.unshift({ id: 0, name: 'My Drive' }); 
+                return path;
+            };
+
+            const renderPathBar = async(folderId) => {
+                const path = await getPath(folderId); const bar = $('#path-bar'); bar.innerHTML = '';
+                path.forEach((segment, index) => {
+                    const el = document.createElement('span');
+                    if (index < path.length -1) { el.innerHTML = `<a href="#" class="hover:underline text-secondary">${segment.name}</a><span class="mx-2 text-secondary">/</span>`; el.querySelector('a').onclick = (e) => { e.preventDefault(); navigateToFolder(segment.id); };
+                    } else { el.textContent = segment.name; el.className = 'font-semibold text-primary'; }
+                    bar.appendChild(el);
+                });
+            };
+
+            const navigateToFolder = (folderId) => {
+                if (folderId === currentFolderId) return;
+                if (historyIndex < navigationHistory.length - 1 && navigationHistory[historyIndex + 1] === folderId) { historyIndex++; }
+                else { navigationHistory.splice(historyIndex + 1); navigationHistory.push(folderId); historyIndex = navigationHistory.length - 1; }
+                renderFileSystem(folderId); updateNavButtons();
+            };
+            
+            const updateNavButtons = () => { $('#back-btn').disabled = historyIndex === 0; $('#forward-btn').disabled = historyIndex === navigationHistory.length - 1; };
+            const getIcon = (item) => {
+                const type = item.type;
+                const color = item.color || (type.includes('folder') ? '#3b82f6' : 'currentColor');
+
+                if (type.startsWith('image/')) return `<svg class="w-16 h-16 text-purple-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+                if (type.startsWith('video/')) return `<svg class="w-16 h-16 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>`;
+                if (type.startsWith('audio/')) return `<svg class="w-16 h-16 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>`;
+                if (type === 'text/html') return `<svg class="w-16 h-16 text-orange-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>`;
+                if (type.includes('folder')) return `<svg class="w-16 h-16" style="color: ${color};" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>`;
+                return `<svg class="w-16 h-16 text-secondary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+            };
+            
+            const createFileElement = (item) => {
+                const icon = getIcon(item);
+                const commonClasses = 'border-2 rounded-lg p-2 cursor-pointer transition-all duration-150';
+                const gridItem = document.createElement('div');
+                const listItem = document.createElement('div');
+                
+                gridItem.className = `file-item flex flex-col items-center text-center bg-tertiary-hover border-transparent ${commonClasses}`;
+                gridItem.innerHTML = `${icon} <span class="mt-2 text-sm text-primary file-name-truncate">${item.name}</span>`;
+                
+                listItem.className = `list-item grid grid-cols-12 gap-4 items-center px-4 py-2 bg-tertiary-hover border-y border-transparent ${commonClasses}`;
+                listItem.innerHTML = `<div class="col-span-6 flex items-center gap-3">${icon.replace('w-16 h-16', 'w-6 h-6')}<span class="text-sm truncate text-primary">${item.name}</span></div><div class="col-span-3 text-sm text-secondary">${new Date(item.updatedAt || item.createdAt).toLocaleDateString()}</div><div class="col-span-3 text-sm text-secondary">${item.size ? formatBytes(item.size) : '--'}</div>`;
+                
+                [gridItem, listItem].forEach(el => {
+                    el.dataset.id = item.id; el.dataset.type = item.type; el.dataset.name = item.name;
+                    if (item.id > 0) el.draggable = true;
+
+                    const contextMenuHandler = (e) => { 
+                        e.preventDefault(); 
+                        e.stopPropagation(); 
+                        if (item.id > 0 && !selectedItems.has(item.id)) { 
+                            clearSelection(); 
+                            toggleSelection(item.id); 
+                        } 
+                        showContextMenu(e.pageX || e.touches[0].pageX, e.pageY || e.touches[0].pageY); 
+                    };
+
+                    el.onclick = (e) => {
+                        clearTimeout(mousePressTimer);
+                        handleItemClick(e, item.id);
+                    };
+                    el.ondblclick = () => { if (!isSelectionModeActive) { item.type.includes('folder') ? navigateToFolder(item.id) : openFile(item.id); } };
+                    if (item.id >= 0) el.oncontextmenu = contextMenuHandler;
+                    
+                    el.ontouchstart = (e) => {
+                        if(item.id < 0) return;
+                        clearTimeout(longPressTimer);
+                        longPressTimer = setTimeout(() => {
+                           e.preventDefault();
+                           contextMenuHandler(e);
+                        }, 1000);
+                    };
+                    el.ontouchend = () => clearTimeout(longPressTimer);
+                    el.ontouchmove = () => clearTimeout(longPressTimer);
+                    
+                    el.onmousedown = (e) => {
+                        if (item.id < 0 || e.button !== 0) return;
+                        clearTimeout(mousePressTimer);
+                        mousePressTimer = setTimeout(() => {
+                           e.preventDefault();
+                           contextMenuHandler(e);
+                        }, 1000);
+                    };
+                    el.onmouseup = () => clearTimeout(mousePressTimer);
+                    el.onmouseleave = () => clearTimeout(mousePressTimer);
+                });
+                return { gridItem, listItem };
+            };
+
+            const isTextFile = (type, name) => {
+                const textTypes = ['text/plain', 'text/html', 'text/css', 'text/javascript', 'application/json', 'application/xml'];
+                const codeExtensions = ['.js', '.py', '.java', '.cpp', '.c', '.h', '.php', '.rb', '.go', '.rs', '.ts', '.html', '.htm', '.css', '.json', '.xml', '.md', '.txt', '.sh', '.bat', '.yaml', '.yml'];
+                if (textTypes.includes(type)) return true;
+                const ext = name.toLowerCase().substring(name.lastIndexOf('.'));
+                return codeExtensions.includes(ext);
+            };
+
+            const openFile = async (fileId) => {
+                let item = await dbGet('files', fileId);
+                if (!item) return;
+
+                let fileData = item.data;
+                if (item.iv && item.data.byteLength > 0) {
+                    fileData = await decryptData(item.data, item.iv);
+                    if (!fileData) return;
+                } else if (!item.data && item.size > 0 && !item.iv) {
+                    showToast("This file is not encrypted and may be from a previous version.");
+                } else if (!item.data && item.size > 0) {
+                     showToast("File data is missing.");
+                       return;
+                }
+
+                const viewer = $('#fullscreen-viewer');
+                viewer.innerHTML = '';
+                viewer.classList.remove('hidden');
+
+                const header = document.createElement('header');
+                header.className = 'flex items-center justify-between p-4 bg-secondary border-b border-primary';
+                
+                const title = document.createElement('h2');
+                title.className = 'font-semibold text-lg text-primary truncate';
+                title.textContent = item.name;
+               
+                const controls = document.createElement('div');
+                controls.className = 'flex items-center gap-2';
+                header.append(title, controls);
+
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'p-2 rounded-full bg-tertiary-hover';
+                closeBtn.title = 'Close';
+                closeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+                closeBtn.onclick = () => viewer.classList.add('hidden');
+                
+                const contentArea = document.createElement('main');
+                contentArea.className = 'flex-grow p-4 overflow-auto flex items-center justify-center';
+                
+                const blob = new Blob([fileData], { type: item.type });
+                const url = URL.createObjectURL(blob);
+
+                if (item.type.startsWith('image/')) {
+                    contentArea.innerHTML = `<img src="${url}" class="max-w-full max-h-full object-contain">`;
+                } else if (item.type.startsWith('video/')) {
+                    contentArea.innerHTML = `<video src="${url}" controls class="max-w-full max-h-full"></video>`;
+                } else if (item.type.startsWith('audio/')) {
+                    contentArea.innerHTML = `<audio src="${url}" controls></audio>`;
+                } else if (item.type === 'application/pdf') {
+                    contentArea.innerHTML = `<iframe src="${url}" type="application/pdf" width="100%" height="100%" class="border-none"></iframe>`;
+                } else if (isTextFile(item.type, item.name)) {
+                    contentArea.className = 'flex-grow overflow-hidden flex flex-col';
+                    const textArea = document.createElement('textarea');
+                    textArea.className = 'w-full h-full bg-primary text-primary p-4 font-mono resize-none no-ring-on-focus';
+                    textArea.value = await blob.text();
+                    contentArea.appendChild(textArea);
+                    
+                    let hasUnsavedChanges = false;
+                    textArea.addEventListener('input', () => {
+                        if (!hasUnsavedChanges) {
+                            title.textContent = `${item.name}*`;
+                            hasUnsavedChanges = true;
+                        }
+                    });
+
+                    const saveBtn = document.createElement('button');
+                    saveBtn.className = 'px-4 py-2 rounded-md accent-primary accent-hover';
+                    saveBtn.textContent = 'Save';
+                    saveBtn.onclick = async () => {
+                        showLoader();
+                        const newContentBuffer = new TextEncoder().encode(textArea.value);
+                        const { ciphertext, iv } = await encryptData(newContentBuffer);
+                        item.data = ciphertext;
+                        item.iv = iv;
+                        item.size = ciphertext.byteLength;
+                        item.updatedAt = new Date();
+                        await dbPut('files', item);
+                        hideLoader();
+                        showToast('File saved!');
+                        title.textContent = item.name;
+                        hasUnsavedChanges = false;
+                        await renderFileSystem(currentFolderId);
+                    };
+                    controls.appendChild(saveBtn);
+                    
+                    if (item.type === 'text/html' || item.name.endsWith('.html') || item.name.endsWith('.htm')) {
+                        const toggleBtn = document.createElement('button');
+                        toggleBtn.className = 'px-4 py-2 rounded-md bg-tertiary bg-tertiary-hover';
+                        toggleBtn.textContent = 'Preview';
+                        let isPreview = false;
+                        
+                        const iframe = document.createElement('iframe');
+                        iframe.className = 'w-full h-full border-none hidden';
+                        contentArea.appendChild(iframe);
+
+                        toggleBtn.onclick = () => {
+                            isPreview = !isPreview;
+                            if (isPreview) {
+                                const defaultStyle = '<style>body { background-color: white; color: black; }</style>';
+                                iframe.srcdoc = defaultStyle + textArea.value;
+                                textArea.classList.add('hidden');
+                                iframe.classList.remove('hidden');
+                                toggleBtn.textContent = 'Edit';
+                            } else {
+                                iframe.classList.add('hidden');
+                                textArea.classList.remove('hidden');
+                                toggleBtn.textContent = 'Preview';
+                            }
+                        };
+                        controls.appendChild(toggleBtn);
+                    }
+                } else {
+                    contentArea.innerHTML = `<div class="text-center"><p class="text-lg">Preview not supported for this file type.</p><button id="download-btn" class="mt-4 accent-primary accent-hover px-4 py-2 rounded-md">Download File</button></div>`;
+                    contentArea.querySelector('#download-btn').onclick = () => downloadFile(fileId);
+                }
+
+                controls.appendChild(closeBtn);
+                viewer.append(header, contentArea);
+                viewer.addEventListener('close', () => URL.revokeObjectURL(url), { once: true });
+            };
+
+            const downloadFile = async (fileId) => {
+                const item = await dbGet('files', fileId);
+                if (!item) return;
+                
+                let fileData = item.data;
+                if(item.iv && item.data.byteLength > 0) {
+                    fileData = await decryptData(item.data, item.iv);
+                    if (!fileData) return;
+                }
+
+                const blob = new Blob([fileData], { type: item.type }); 
+                const url = URL.createObjectURL(blob); 
+                const a = document.createElement('a'); 
+                a.href = url; a.download = item.name; a.click(); 
+                URL.revokeObjectURL(url); 
+            };
+            
+            const uploadFiles = async (files) => { 
+                closeModal(); 
+                let totalSize = 0;
+                for (const file of files) totalSize += file.size;
+                let uploadedSize = 0;
+                const progressContainer = document.createElement('div');
+                progressContainer.id = 'upload-progress';
+                progressContainer.className = 'fixed bottom-5 left-5 bg-secondary p-4 rounded-lg shadow-lg z-90 flex flex-col gap-2';
+                const progressText = document.createElement('p');
+                progressText.className = 'text-sm text-primary';
+                progressText.textContent = 'Uploading 0%';
+                const progressBar = document.createElement('div');
+                progressBar.className = 'w-64 h-2 bg-tertiary rounded-full';
+                const progressFill = document.createElement('div');
+                progressFill.className = 'h-full bg-accent-primary rounded-full transition-width';
+                progressFill.style.width = '0%';
+                progressBar.appendChild(progressFill);
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'text-red-400 text-sm hover:underline self-start';
+                cancelBtn.textContent = 'Cancel';
+                progressContainer.append(progressText, progressBar, cancelBtn);
+                document.body.appendChild(progressContainer);
+                let cancelled = false;
+                let uploadedIds = [];
+                cancelBtn.onclick = async () => {
+                    cancelled = true;
+                    showLoader();
+                    const tx = db.transaction('files', 'readwrite');
+                    const store = tx.objectStore('files');
+                    for (const id of uploadedIds) {
+                        store.delete(id);
+                    }
+                    await new Promise(r => tx.oncomplete = r);
+                    hideLoader();
+                    progressContainer.remove();
+                    showToast('Upload cancelled.');
+                    await renderFileSystem(currentFolderId);
+                };
+                try {
+                    for (const file of files) {
+                        if (cancelled) break;
+                        const plainBuffer = await file.arrayBuffer();
+                        const { ciphertext, iv } = await encryptData(plainBuffer);
+                        const id = await dbAdd('files', { name: file.name, type: file.type || 'application/octet-stream', size: ciphertext.byteLength, data: ciphertext, iv: iv, userId: currentUser, parentId: currentFolderId, createdAt: new Date(), updatedAt: new Date() }); 
+                        uploadedIds.push(id);
+                        uploadedSize += file.size;
+                        const percent = Math.round((uploadedSize / totalSize) * 100);
+                        progressFill.style.width = `${percent}%`;
+                        progressText.textContent = `Uploading ${percent}%`;
+                    }
+                    if (!cancelled) {
+                        showToast(`${files.length} file(s) uploaded & encrypted.`);
+                    }
+                } catch (e) {
+                    showToast('Upload error.');
+                } finally {
+                    await renderFileSystem(currentFolderId);
+                    progressContainer.remove();
+                }
+            };
+
+            const uploadFolder = async (files) => {
+                closeModal();
+                if (files.length === 0) return;
+                showLoader();
+                const tx = db.transaction('files', 'readwrite');
+                const store = tx.objectStore('files');
+                const pathMap = new Map();
+
+                try {
+                    for (const file of Array.from(files)) {
+                        const pathParts = file.webkitRelativePath.split('/');
+                        const fileName = pathParts.pop();
+                        let parentId = currentFolderId;
+                        let currentPath = '';
+
+                        for (const part of pathParts) {
+                            const newPath = currentPath ? `${currentPath}/${part}` : part;
+                            if (pathMap.has(newPath)) {
+                                parentId = pathMap.get(newPath);
+                            } else {
+                                const folderData = { name: part, type: 'folder', userId: currentUser, parentId: parentId, createdAt: new Date(), updatedAt: new Date() };
+                                const newFolderId = await new Promise(r => store.add(folderData).onsuccess = e => r(e.target.result));
+                                pathMap.set(newPath, newFolderId);
+                                parentId = newFolderId;
+                            }
+                            currentPath = newPath;
+                        }
+                        
+                        const plainBuffer = await file.arrayBuffer();
+                        const { ciphertext, iv } = await encryptData(plainBuffer);
+                        const fileData = { name: fileName, type: file.type || 'application/octet-stream', size: ciphertext.byteLength, data: ciphertext, iv: iv, userId: currentUser, parentId: parentId, createdAt: new Date(), updatedAt: new Date() };
+                        await new Promise(r => store.add(fileData).onsuccess = e => r(e.target.result));
+                    }
+
+                    await new Promise(r => tx.oncomplete = r);
+                    showToast('Folder(s) uploaded successfully.');
+                } catch (e) {
+                    console.error("Folder upload error:", e);
+                    showToast('An error occurred during folder upload.');
+                    tx.abort();
+                } finally {
+                    hideLoader();
+                    await renderFileSystem(currentFolderId);
+                }
+            };
+            
+            const getAllDescendants = async (itemId, tx) => {
+                const store = tx.objectStore('files');
+                const allDescendants = new Set();
+                const queue = [itemId];
+                
+                while (queue.length > 0) {
+                    const currentParentId = queue.shift();
+                    const children = await new Promise(r => store.index('by_user_parent').getAll([currentUser, currentParentId]).onsuccess = e => r(e.target.result));
+                    for (const child of children) {
+                        allDescendants.add(child.id);
+                        if (child.type.includes('folder')) {
+                            queue.push(child.id);
+                        }
+                    }
+                }
+                return allDescendants;
+            };
+
+            const deleteItems = async () => {
+                const numItems = selectedItems.size;
+                if (numItems === 0) return;
+
+                const itemId = selectedItems.values().next().value;
+                const item = await dbGet('files', itemId);
+                const isSingleFolder = item && item.type.includes('folder') && numItems === 1;
+
+                const title = isSingleFolder ? "Delete this folder?" : `Delete ${numItems} item(s)?`;
+                const body = `This will permanently delete the selected item(s) and all their contents. This action cannot be undone.`;
+
+                showConfirmModal({
+                    title,
+                    body,
+                    isDestructive: true,
+                    onConfirm: async () => {
+                        closeModal(); // <-- FIX: This line closes the modal immediately
+                        showLoader();
+                        const tx = db.transaction('files', 'readwrite');
+                        const store = tx.objectStore('files');
+
+                        const toDelete = new Set(selectedItems);
+
+                        for (const id of selectedItems) {
+                            const file = await new Promise(r => store.get(id).onsuccess = e => r(e.target.result));
+                            if (file && file.type.includes('folder')) {
+                                const descendants = await getAllDescendants(id, tx);
+                                descendants.forEach(descId => toDelete.add(descId));
+                            }
+                        }
+
+                        const deletePromises = Array.from(toDelete).map(id => new Promise(r => store.delete(id).onsuccess = r));
+                        await Promise.all(deletePromises);
+
+                        await new Promise(r => tx.oncomplete = r);
+                        await renderFileSystem(currentFolderId);
+                        hideLoader();
+                        showToast(`${toDelete.size} item(s) deleted.`);
+                    }
+                });
+            };
+
+            const moveItems = async (itemIds, newParentId) => { 
+                showLoader(); 
+                for (const itemId of itemIds) { 
+                    if(itemId === newParentId) continue;
+                    const item = await dbGet('files', itemId); 
+                    if (item) { 
+                        let parent = newParentId;
+                        let isDescendant = false;
+                        while(parent !== 0) {
+                            if (parent === itemId) {
+                                isDescendant = true;
+                                break;
+                            }
+                            const parentItem = await dbGet('files', parent);
+                            parent = parentItem ? parentItem.parentId : 0;
+                        }
+                        if (isDescendant) {
+                            showToast("Cannot move a folder into itself or a subfolder.");
+                            continue;
+                        }
+
+                        item.parentId = newParentId; 
+                        item.updatedAt = new Date(); 
+                        await dbPut('files', item); 
+                    } 
+                } 
+                await renderFileSystem(currentFolderId); 
+                showToast(`${itemIds.length} item(s) moved.`); 
+                closeModal(); 
+                hideLoader(); 
+            };
+
+            const renameItems = async (newName) => { 
+                if (!newName || selectedItems.size !== 1) return; 
+                const itemId = selectedItems.values().next().value; 
+                const item = await dbGet('files', itemId); 
+                if (item) { 
+                    item.name = newName; 
+                    item.updatedAt = new Date(); 
+                    await dbPut('files', item); 
+                    await renderFileSystem(currentFolderId); 
+                    showToast('Item renamed.'); 
+                    closeModal(); 
+                } 
+            };
+
+            const hideContextMenu = () => $('#context-menu').classList.add('hidden');
+
+            const showContextMenu = async (x, y, anchor) => {
+                contextMenuJustOpened = true;
+                const menu = $('#context-menu');
+                menu.innerHTML = ''; let options = [];
+                const numSelected = selectedItems.size;
+                const totalItemsInView = $$('.file-item:not([data-id^="-"])').length;
+
+                const selectAllOption = {
+                    label: (numSelected === totalItemsInView && totalItemsInView > 0) ? 'Unselect All' : 'Select All',
+                    action: () => {
+                        if (numSelected === totalItemsInView && totalItemsInView > 0) {
+                            exitSelectionMode();
+                        } else {
+                            selectAllFiles();
+                        }
+                    },
+                    disabled: totalItemsInView === 0
+                };
+                
+                if (numSelected > 0) {
+                    options.push({ label: 'Copy', action: copyItems });
+                }
+
+                if (numSelected === 1) {
+                    const itemId = selectedItems.values().next().value;
+                    const item = await dbGet('files', itemId);
+                    if (!item) return;
+
+                    if (item.type.includes('folder')) {
+                        options.push({ label: 'Open', action: () => navigateToFolder(itemId) });
+                    } else {
+                        options.push({ label: 'Preview', action: () => openFile(itemId) });
+                        options.push({ label: 'Download', action: () => downloadFile(itemId) });
+                    }
+                    if (itemId > 0 && currentFolderId >= 0) {
+                        options.push({ label: 'Rename', action: () => showRenameModal(itemId, item.name) });
+                        options.push({ label: 'Move', action: () => showMoveModal() });
+                    }
+                    options.push({ label: 'Properties', action: () => showPropertiesModal(itemId) });
+                    options.push({ label: 'Delete', action: deleteItems, isDestructive: true });
+                } else if (numSelected > 1) {
+                    if (currentFolderId >= 0) {
+                        options.push({ label: 'Move', action: () => showMoveModal() });
+                    }
+                    options.push({ label: `Delete ${numSelected} Items`, action: deleteItems, isDestructive: true });
+                } else {
+                    if (currentFolderId >= 0) {
+                        options.push({ label: 'Paste', action: pasteItems, disabled: clipboard.items.size === 0 });
+                        options.push({ label: 'New Folder', action: showNewFolderModal });
+                        options.push({ label: 'New Text File', action: () => showNewFileModal('text/plain', 'new_document.txt') });
+                        options.push({ label: 'New HTML File', action: () => showNewFileModal('text/html', 'new_page.html') });
+                        options.push({ label: 'Upload', action: showUploadModal });
+                    }
+                }
+                
+                options.push(selectAllOption);
+                
+                options.forEach(opt => { 
+                    const el = document.createElement('div'); 
+                    el.textContent = opt.label; 
+                    el.className = `px-4 py-2 bg-tertiary-hover ${opt.disabled ? 'cursor-not-allowed text-secondary' : 'cursor-pointer'} ${opt.isDestructive ? 'text-red-400' : 'text-primary'}`; 
+                    if(!opt.disabled) el.onclick = () => { opt.action(); hideContextMenu(); }; 
+                    menu.appendChild(el); 
+                });
+                
+                menu.classList.remove('hidden');
+                const { offsetWidth: menuWidth, offsetHeight: menuHeight } = menu;
+                let newX = (anchor === 'anchor-right' || (x + menuWidth > window.innerWidth)) ? x - menuWidth : x;
+                let newY = (y + menuHeight > window.innerHeight) ? y - menuHeight : y;
+                menu.style.left = `${Math.max(0, newX)}px`;
+                menu.style.top = `${Math.max(0, newY)}px`;
+            };
+
+            const renderGenericModal = (config) => {
+                const modalHTML = `<div id="${config.id}" class="fixed inset-0 flex items-center justify-center modal"><div class="bg-secondary rounded-lg shadow-xl p-6 w-full ${config.size || 'max-w-sm'}"><h3 class="text-lg font-bold mb-4 text-primary">${config.title}</h3>${config.body ? `<div class="text-sm text-secondary mb-4">${config.body}</div>` : ''}<form id="${config.id}-form">${config.formBody || ''}<div class="mt-4 flex justify-end gap-2">${config.hideCancel ? '' : '<button type="button" class="modal-cancel-btn px-4 py-2 bg-tertiary bg-tertiary-hover rounded-md text-primary">Cancel</button>'}${config.hideConfirm ? '' : `<button type="submit" class="px-4 py-2 rounded-md ${config.isDestructive ? 'destructive-primary destructive-hover' : 'accent-primary accent-hover'}">${config.confirmText}</button>`}</div></form></div></div>`;
+                $('#generic-modal-container').innerHTML = modalHTML;
+                const form = $(`#${config.id}-form`);
+                openModal($(`#${config.id}`));
+                form.onsubmit = (e) => { e.preventDefault(); config.onSubmit(e); };
+                $$('.modal-cancel-btn').forEach(btn => btn.onclick = closeModal);
+                const input = form.querySelector('input');
+                if(input) input.focus();
+            };
+
+            const showNewFileModal = (type, defaultName) => {
+                renderGenericModal({
+                    id: 'new-file-modal',
+                    title: 'Create New File',
+                    confirmText: 'Create',
+                    formBody: `<input type="text" id="modal-input" value="${defaultName}" class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required>`,
+                    onSubmit: async () => {
+                        const name = $('#modal-input').value.trim();
+                        if (!name) { showToast("File name cannot be empty."); return; }
+                        const existingFiles = await dbGetAll('files', 'by_user_parent', [currentUser, currentFolderId]);
+                        if (existingFiles.some(f => f.name === name)) { showToast(`A file named '${name}' already exists here.`); return; }
+
+                        let finalType = type;
+                        if (name.endsWith('.html') || name.endsWith('.htm')) {
+                            finalType = 'text/html';
+                        }
+
+                        const { ciphertext, iv } = await encryptData(new ArrayBuffer(0));
+                        const newItem = { name, type: finalType, data: ciphertext, iv: iv, size: 0, userId: currentUser, parentId: currentFolderId, createdAt: new Date(), updatedAt: new Date() };
+                        const newId = await dbAdd('files', newItem);
+                        await renderFileSystem(currentFolderId);
+                        closeModal();
+                        openFile(newId);
+                    }
+                });
+                setTimeout(() => $('#modal-input').select(), 100);
+            };
+
+            const createWizard = (config) => {
+                let currentStep = 0;
+                let wizardState = {};
+                const body = `<div class="relative">${config.steps.map((s, i) => `<div class="wizard-step ${i === 0 ? 'active' : ''}" data-step="${i}">${s.content}</div>`).join('')}</div>`;
+                const footer = `<div class="mt-6 flex justify-between items-center w-full">
+                    <button type="button" id="wizard-back-btn" class="p-2 rounded-full bg-tertiary-hover" title="Back">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <button type="submit" class="p-2 rounded-full accent-primary accent-hover" title="Next">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+                    </button>
+                </div>`;
+                
+                renderGenericModal({ 
+                    id: config.id, 
+                    title: config.title, 
+                    body, 
+                    hideCancel: true, 
+                    hideConfirm: true,
+                    formBody: footer, 
+                    onSubmit: async (e) => {
+                        const result = await config.steps[currentStep].onNext(wizardState);
+                        if (result.success) {
+                            wizardState = { ...wizardState, ...result.data };
+                            currentStep++;
+                            if (currentStep >= config.steps.length) {
+                                await config.onFinish(wizardState);
+                                closeModal();
+                            } else {
+                                updateWizardView();
+                            }
+                        } else { 
+                            showToast(result.error || 'Please complete the current step.');
+                            const passInput = $(`#${config.id} .wizard-step.active input[type="password"]`);
+                            if (passInput) passInput.value = '';
+                        }
+                    }
+                });
+
+                const wizardModal = $(`#${config.id}`);
+                const backButton = wizardModal.querySelector('#wizard-back-btn');
+                const form = wizardModal.querySelector('form');
+                form.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.dispatchEvent(new Event('submit')); } };
+                
+                backButton.onclick = () => {
+                    if (currentStep > 0) {
+                        currentStep--;
+                        updateWizardView();
+                    }
+                };
+
+                const updateWizardView = () => {
+                    $$(`#${config.id} .wizard-step`).forEach(el => el.classList.toggle('active', parseInt(el.dataset.step) === currentStep));
+                    backButton.style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+                    wizardModal.querySelector('.wizard-step.active input')?.focus();
+                };
+                updateWizardView();
+            };
+
+            const showChangePasswordWizard = () => {
+                createWizard({
+                    id: 'change-password-wizard', title: 'Change Password',
+                    steps: [
+                        {
+                            content: `<label class="block text-sm font-medium text-secondary">Current Password</label><input type="password" id="wizard-current-password" class="mt-1 block w-full bg-tertiary border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required>`,
+                            onNext: async (state) => {
+                                const pass = $('#wizard-current-password').value;
+                                if (!pass) return { success: false, error: 'Password is required.' };
+                                showLoader();
+                                const user = await dbGet('users', currentUser);
+                                const hash = await hashPassword(pass, hexToBuffer(user.salt));
+                                hideLoader();
+                                return hash === user.passwordHash ? { success: true } : { success: false, error: 'Incorrect password.' };
+                            }
+                        },
+                        {
+                            content: `<div class="space-y-4"><label class="block text-sm font-medium text-secondary">New Password</label><input type="password" id="wizard-new-password" class="mt-1 block w-full bg-tertiary border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required><label class="block text-sm font-medium text-secondary">Confirm New Password</label><input type="password" id="wizard-confirm-password" class="mt-1 block w-full bg-tertiary border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required></div>`,
+                            onNext: async (state) => {
+                                const newPass = $('#wizard-new-password').value;
+                                const confirmPass = $('#wizard-confirm-password').value;
+                                if (newPass.length < 4) return { success: false, error: 'Password must be at least 4 characters.'};
+                                if (newPass !== confirmPass) return { success: false, error: "Passwords don't match." };
+                                return { success: true, data: { newPass } };
+                            }
+                        }
+                    ],
+                    onFinish: async (state) => {
+                        showLoader();
+                        const user = await dbGet('users', currentUser);
+                        user.passwordHash = await hashPassword(state.newPass, hexToBuffer(user.salt));
+                        await dbPut('users', user);
+                        hideLoader();
+                        showToast('Password changed successfully! Please log in again to re-initialize your encryption key.');
+                        handleLogout();
+                    }
+                });
+            };
+            
+            const showChangeUsernameWizard = () => {
+                 createWizard({
+                    id: 'change-username-wizard', title: 'Change Username',
+                    steps: [
+                        {
+                            content: `<p class="text-sm text-secondary mb-4">For security, please confirm your current password.</p><label class="block text-sm font-medium text-secondary">Current Password</label><input type="password" id="wizard-current-password-username" class="mt-1 block w-full bg-tertiary border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required>`,
+                            onNext: async (state) => {
+                                const pass = $('#wizard-current-password-username').value;
+                                if (!pass) return { success: false, error: 'Password is required.' };
+                                showLoader();
+                                const user = await dbGet('users', currentUser);
+                                const hash = await hashPassword(pass, hexToBuffer(user.salt));
+                                hideLoader();
+                                return hash === user.passwordHash ? { success: true } : { success: false, error: 'Incorrect password.' };
+                            }
+                        },
+                        {
+                            content: `<p class="text-sm text-secondary mb-4">Enter your desired new username. This will log you out.</p><label class="block text-sm font-medium text-secondary">New Username</label><input type="text" id="wizard-new-username" class="mt-1 block w-full bg-tertiary border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required>`,
+                            onNext: async (state) => {
+                                const newUsername = $('#wizard-new-username').value.trim();
+                                if (!newUsername) return { success: false, error: 'New username cannot be empty.' };
+                                if (newUsername === currentUser) return { success: false, error: 'New username cannot be the same as the old one.' };
+                                if (await dbGet('users', newUsername)) return { success: false, error: 'This username is already taken.' };
+                                return { success: true, data: { newUsername } };
+                            }
+                        }
+                    ],
+                    onFinish: async (state) => {
+                        showLoader();
+                        const oldUsername = currentUser;
+                        const { newUsername } = state;
+
+                        const tx = db.transaction(['users', 'settings', 'files'], 'readwrite');
+                        const usersStore = tx.objectStore('users');
+                        const settingsStore = tx.objectStore('settings');
+                        const filesStore = tx.objectStore('files');
+                        
+                        const userReq = new Promise(r => usersStore.get(oldUsername).onsuccess = e => r(e.target.result));
+                        const settingsReq = new Promise(r => settingsStore.get(oldUsername).onsuccess = e => r(e.target.result));
+                        const filesReq = new Promise(r => filesStore.index('by_user_parent').getAll(IDBKeyRange.bound([oldUsername, -Infinity], [oldUsername, Infinity])).onsuccess = e => r(e.target.result));
+                        
+                        const [user, settings, userFiles] = await Promise.all([userReq, settingsReq, filesReq]);
+
+                        if (!user) {
+                           hideLoader();
+                           showToast('Error: Could not find current user data.');
+                           tx.abort();
+                           return;
+                        }
+                        
+                        usersStore.delete(oldUsername);
+                        user.username = newUsername;
+                        usersStore.add(user);
+
+                        if (settings) {
+                            settingsStore.delete(oldUsername);
+                            settings.userId = newUsername;
+                            settingsStore.add(settings);
+                        }
+                        
+                        for (const file of userFiles) { file.userId = newUsername; filesStore.put(file); }
+
+                        await new Promise(r => tx.oncomplete = r);
+                        hideLoader();
+                        showToast('Username changed successfully! Please log in again.');
+                        handleLogout();
+                    }
+                });
+            };
+
+            const showConfirmModal = (config) => renderGenericModal({ ...config, id: 'confirm-modal', confirmText: config.confirmText || 'Confirm', onSubmit: () => { config.onConfirm(); } });
+            const showNewFolderModal = () => {
+                const formBody = `
+                    <div class="flex items-center gap-4">
+                        <input type="text" id="modal-input" placeholder="Folder Name" class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required>
+                        <input type="color" id="folder-color-input" value="#3b82f6">
+                    </div>`;
+                renderGenericModal({ 
+                    id: 'new-folder-modal', 
+                    title: 'New Folder', 
+                    confirmText: 'Create', 
+                    formBody: formBody, 
+                    onSubmit: () => createFolder($('#modal-input').value.trim(), $('#folder-color-input').value) 
+                });
+            };
+
+            const createFolder = async (name, color) => { 
+                await dbAdd('files', { name, type: 'folder', color, userId: currentUser, parentId: currentFolderId, createdAt: new Date(), updatedAt: new Date() }); 
+                await renderFileSystem(currentFolderId); 
+                closeModal(); 
+                showToast(`Folder '${name}' created.`); 
+            };
+            
+            const showRenameModal = (itemId, currentName) => {
+                renderGenericModal({ id: 'rename-modal', title: 'Rename', confirmText: 'Rename', formBody: `<input type="text" id="modal-input" value="${currentName}" class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" required>`, onSubmit: () => renameItems($('#modal-input').value.trim()) });
+                setTimeout(() => $('#modal-input').select(), 100);
+            };
+
+            const showUploadModal = () => renderGenericModal({ id: 'upload-modal', title: 'Upload', confirmText: 'Close', hideCancel: true, formBody: `<div class="flex flex-col gap-3"><button type="button" id="upload-files-btn" class="w-full p-3 bg-tertiary bg-tertiary-hover rounded-md text-center">Upload File(s)</button><button type="button" id="upload-folder-btn" class="w-full p-3 bg-tertiary bg-tertiary-hover rounded-md text-center">Upload Folder</button></div>`, onSubmit: closeModal });
+            
+            const showPropertiesModal = async (itemId) => { 
+                const item = await dbGet('files', itemId); 
+                if (!item) return; 
+                let folderColorEditor = '';
+                if (item.type.includes('folder')) {
+                    folderColorEditor = `
+                        <div class="flex items-center gap-4 pt-2">
+                            <label class="font-semibold">Color:</label>
+                            <input type="color" id="properties-color-input" value="${item.color || '#3b82f6'}">
+                        </div>`;
+                }
+                let content = `<div class="space-y-2 text-sm text-primary"><p><strong>Name:</strong> ${item.name}</p><p><strong>Type:</strong> ${item.type.includes('folder') ? 'Folder' : item.type}</p>${item.size ? `<p><strong>Size:</strong> ${formatBytes(item.size)}</p>` : ''}<p><strong>Encrypted:</strong> ${item.iv ? 'Yes' : 'No'}</p><p><strong>Created:</strong> ${new Date(item.createdAt).toLocaleString()}</p><p><strong>Modified:</strong> ${new Date(item.updatedAt).toLocaleString()}</p>${folderColorEditor}</div>`; 
+                renderGenericModal({ 
+                    id: 'properties-modal', 
+                    title: 'Properties', 
+                    confirmText: item.type.includes('folder') ? 'Save' : 'Close', 
+                    body: content, 
+                    onSubmit: async () => {
+                        if (item.type.includes('folder')) {
+                            const newColor = $('#properties-color-input').value;
+                            if (newColor !== item.color) {
+                                item.color = newColor;
+                                await dbPut('files', item);
+                                await renderFileSystem(currentFolderId);
+                            }
+                        }
+                        closeModal();
+                    }
+                }); 
+            };
+            const showMoveModal = async () => { 
+                const folders = await dbGetAll('files', 'by_user_parent', IDBKeyRange.bound([currentUser, -Infinity], [currentUser, Infinity]));
+                const actualFolders = folders.filter(f => f.type === 'folder' && !selectedItems.has(f.id));
+                
+                let folderListHTML = '';
+                const buildList = (parentId, indent = 0) => {
+                    actualFolders.filter(f => f.parentId === parentId).forEach(f => {
+                        folderListHTML += `<div class="folder-item p-2 rounded-md hover:bg-tertiary-hover cursor-pointer" data-id="${f.id}" style="padding-left: ${1 + indent * 1.5}rem;">${f.name}</div>`;
+                        buildList(f.id, indent + 1);
+                    });
+                };
+                buildList(0);
+                const body = `<div class="space-y-2"><input type="search" id="move-search" placeholder="Search folders..." class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus"><div id="folder-list" class="max-h-60 overflow-y-auto border border-primary rounded-md p-1"><div class="folder-item p-2 rounded-md hover:bg-tertiary-hover cursor-pointer font-semibold" data-id="0">My Drive (Root)</div>${folderListHTML}</div></div>`;
+                renderGenericModal({id: 'move-modal', title: 'Move Item(s)', size: 'max-w-md', confirmText: 'Move', formBody: body, onSubmit: (e) => { const selectedFolder = $(`#move-modal .folder-item.selected`); if(selectedFolder) moveItems(Array.from(selectedItems), parseInt(selectedFolder.dataset.id)) }}); 
+                $('#move-search').oninput = e => { const term = e.target.value.toLowerCase(); $$('#move-modal .folder-item').forEach(f => f.classList.toggle('hidden', !f.textContent.toLowerCase().includes(term))); };
+                $$('#move-modal .folder-item').forEach(item => item.onclick = () => { $$('#move-modal .folder-item.selected').forEach(s => s.classList.remove('selected', 'bg-tertiary-active')); item.classList.add('selected', 'bg-tertiary-active'); });
+            };
+
+            const copyItems = () => {
+                if (selectedItems.size === 0) return;
+                clipboard.items = new Set(selectedItems);
+                clipboard.operation = 'copy';
+                showToast(`Copied ${clipboard.items.size} item(s).`);
+            };
+
+            const pasteItems = async () => {
+                if (clipboard.items.size === 0 || currentFolderId < 0) return;
+                showLoader();
+
+                const allUserFiles = await dbGetAll('files', 'by_user_parent', IDBKeyRange.bound([currentUser, -Infinity], [currentUser, Infinity]));
+                const newItemsToCreate = [];
+                const idMap = new Map();
+
+                const getUniqueName = (name, parentId, isFolder) => {
+                    const siblings = allUserFiles.filter(f => f.parentId === parentId);
+                    let newName = name;
+                    let counter = 1;
+                    while (siblings.some(f => f.name === newName) || newItemsToCreate.some(i => i.parentId === parentId && i.name === newName)) {
+                        const copySuffix = ` (Copy ${counter})`;
+                        if (isFolder) { newName = name + copySuffix; } 
+                        else {
+                            const parts = name.split('.');
+                            const extension = parts.length > 1 ? `.${parts.pop()}` : '';
+                            const baseName = parts.join('.');
+                            newName = baseName + copySuffix + extension;
+                        }
+                        counter++;
+                    }
+                    return newName;
+                };
+                
+                const preparePasteRecursive = (itemId, newParentId) => {
+                    const originalItem = allUserFiles.find(f => f.id === itemId);
+                    if (!originalItem) return;
+
+                    const newItem = { ...originalItem };
+                    delete newItem.id;
+                    newItem.parentId = newParentId;
+                    newItem.createdAt = new Date();
+                    newItem.updatedAt = new Date();
+                    newItem.name = getUniqueName(originalItem.name, newParentId, originalItem.type.includes('folder'));
+                    
+                    newItemsToCreate.push(newItem);
+                    idMap.set(originalItem.id, newItem);
+
+                    if (originalItem.type.includes('folder')) {
+                        const children = allUserFiles.filter(f => f.parentId === originalItem.id);
+                        for (const child of children) {
+                            preparePasteRecursive(child.id, originalItem.id);
+                        }
+                    }
+                };
+
+                for (const itemId of clipboard.items) {
+                    preparePasteRecursive(itemId, currentFolderId);
+                }
+
+                const tx = db.transaction('files', 'readwrite');
+                const store = tx.objectStore('files');
+
+                try {
+                    const creationPromises = newItemsToCreate.map(item => {
+                        return new Promise(async (resolve, reject) => {
+                            if (idMap.has(item.parentId)) {
+                                const parentObject = idMap.get(item.parentId);
+                                if (!parentObject.id) {
+                                    parentObject.id = await parentObject.creationPromise;
+                                }
+                                item.parentId = parentObject.id;
+                            }
+                            const req = store.add(item);
+                            req.onerror = reject;
+                            req.onsuccess = () => {
+                                item.id = req.result;
+                                resolve(req.result);
+                            };
+                        });
+                    });
+
+                    newItemsToCreate.forEach((item, index) => {
+                        item.creationPromise = creationPromises[index];
+                    });
+
+                    await Promise.all(creationPromises);
+                    await new Promise(r => tx.oncomplete = r);
+                    showToast(`${clipboard.items.size} item(s) pasted.`);
+                } catch(e) {
+                    console.error("Paste error:", e);
+                    showToast("Error during paste operation.");
+                    tx.abort();
+                } finally {
+                    clipboard = { items: new Set(), operation: null };
+                    await renderFileSystem(currentFolderId);
+                    hideLoader();
+                }
+            };
+            
+            const debounce = (fn, delay = 300) => {
+                let timeout;
+                return (...args) => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => fn(...args), delay);
+                };
+            };
+
+            const renderSearchResults = async (term) => {
+                const resultsContainer = $('#search-results');
+                resultsContainer.innerHTML = '';
+                if (!term) return;
+
+                const itemsToSearch = await dbGetAll('files', 'by_user_parent', IDBKeyRange.bound([currentUser, -Infinity], [currentUser, Infinity]));
+                let results = itemsToSearch.filter(i => i.name.toLowerCase().includes(term.toLowerCase()));
+
+                if (results.length === 0) {
+                    resultsContainer.innerHTML = '<p class="text-center text-secondary">No results found.</p>';
+                    return;
+                }
+
+                for (const item of results) {
+                    const path = await getPath(item.parentId);
+                    const pathString = path.map(p => p.name).join(' / ');
+                    const { listItem } = createFileElement(item);
+                    
+                    const nameDiv = listItem.querySelector('.col-span-6');
+                    nameDiv.innerHTML += `<span class="text-xs text-secondary truncate block">${pathString}</span>`;
+
+                    listItem.ondblclick = () => {
+                        closeModal();
+                        if (item.type.includes('folder')) {
+                            navigateToFolder(item.id);
+                        } else {
+                            openFile(item.id);
+                        }
+                    };
+                    
+                    resultsContainer.appendChild(listItem);
+                }
+            };
+
+            const setupEventListeners = () => {
+                $('#password-form').onsubmit = handleLogin;
+                $('#signup-form').onsubmit = handleSignup;
+                $$('.modal-cancel-btn').forEach(btn => btn.onclick = closeModal);
+                modalBackdrop.onclick = () => { closeModal(); $('#fullscreen-viewer').classList.add('hidden'); closeSettings(); };
+                $('#settings-btn').onclick = prepareSettingsPanel;
+                $('#settings-close-btn').onclick = closeSettings;
+                $('#settings-close-btn-mobile').onclick = closeSettings;
+                $('#settings-sidebar-toggle').onclick = () => $('#settings-sidebar').classList.toggle('open');
+                $('#logout-btn').onclick = handleLogout;
+                $('#logout-btn-header').onclick = handleLogout;
+                $('#search-btn').onclick = () => { openModal($('#search-modal')); $('#search-modal-input').focus(); $('#search-modal-input').value = ''; $('#search-results').innerHTML = ''; };
+                $('#search-modal-input').oninput = debounce((e) => renderSearchResults(e.target.value.trim()));
+                $('#more-options-btn').onclick = e => { const r = e.currentTarget.getBoundingClientRect(); showContextMenu(r.right, r.bottom + 10, 'anchor-right') };
+                $('#theme-dark-btn').onclick = () => updateSettings({ theme: 'dark' });
+                $('#theme-light-btn').onclick = () => updateSettings({ theme: 'light' });
+                 $('#auth-theme-dark-btn').onclick = () => { document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light'); $('#auth-theme-dark-btn').classList.add('active'); $('#auth-theme-light-btn').classList.remove('active'); };
+                 $('#auth-theme-light-btn').onclick = () => { document.documentElement.classList.remove('dark'); document.documentElement.classList.add('light'); $('#auth-theme-light-btn').classList.add('active'); $('#auth-theme-dark-btn').classList.remove('active');};
+                $('#view-toggle-btn').onclick = () => updateSettings({ view: currentSettings.view === 'grid' ? 'list' : 'grid' });
+                $('#upload-pfp-btn').onclick = () => $('#pfp-upload-input').click();
+                $('#remove-pfp-btn').onclick = async () => { await updateSettings({ pfp: null }); $('#settings-pfp-preview').src = DEFAULT_PFP_SVG; $('#settings-pfp-header').src = DEFAULT_PFP_SVG; showToast('Profile picture removed.'); };
+                $('#pfp-upload-input').onchange = async (e) => { const f=e.target.files[0]; if(f){showLoader();const r=new FileReader();r.onload=async ev=>{await updateSettings({pfp:ev.target.result});$('#settings-pfp-preview').src=ev.target.result; $('#settings-pfp-header').src=ev.target.result; hideLoader();showToast('PFP updated!')};r.readAsDataURL(f)}};
+                $('#back-btn').onclick = () => { if (historyIndex > 0) { historyIndex--; renderFileSystem(navigationHistory[historyIndex]); updateNavButtons(); }};
+                $('#forward-btn').onclick = () => { if (historyIndex < navigationHistory.length - 1) { historyIndex++; renderFileSystem(navigationHistory[historyIndex]); updateNavButtons(); }};
+                window.onclick = (e) => { 
+                    if (contextMenuJustOpened) {
+                        contextMenuJustOpened = false;
+                        return;
+                    }
+                    if (!e.target.closest('.file-item, .list-item, .modal, #context-menu, #more-options-btn')) { 
+                        if(isSelectionModeActive) exitSelectionMode();
+                        else clearSelection(); 
+                    } 
+                    if (!e.target.closest('#context-menu, #more-options-btn')) { 
+                        hideContextMenu(); 
+                    }
+                    if ($('#settings-sidebar').classList.contains('open') && !e.target.closest('#settings-sidebar') && !e.target.closest('#settings-sidebar-toggle')) {
+                        $('#settings-sidebar').classList.remove('open');
+                    }
+                };
+                $('#file-browser').oncontextmenu = (e) => { if(!e.target.closest('.file-item, .list-item')) { e.preventDefault(); clearSelection(); showContextMenu(e.pageX, e.pageY); } };
+                $('#file-upload-input').onchange = (e) => uploadFiles(e.target.files);
+                $('#folder-upload-input').onchange = (e) => uploadFolder(e.target.files);
+                $('#generic-modal-container').addEventListener('click', e => { if (e.target.id === 'upload-files-btn') $('#file-upload-input').click(); if (e.target.id === 'upload-folder-btn') $('#folder-upload-input').click(); });
+                $$('.settings-nav-item').forEach(item => item.onclick = (e) => { e.preventDefault(); $$('.settings-section').forEach(s => s.classList.add('hidden')); $(`#settings-section-${e.currentTarget.dataset.section}`).classList.remove('hidden'); $$('.settings-nav-item').forEach(i => i.classList.remove('active')); e.currentTarget.classList.add('active'); if(window.innerWidth < 768) $('#settings-sidebar').classList.remove('open'); });
+                $('#change-password-start-btn').onclick = showChangePasswordWizard;
+                $('#change-username-start-btn').onclick = showChangeUsernameWizard;
+                $('#selection-done-btn').onclick = exitSelectionMode;
+                $('#delete-selected-btn').onclick = deleteItems;
+                $('#move-selected-btn').onclick = showMoveModal;
+                $('#copy-selected-btn').onclick = copyItems;
+                $('#delete-all-files-btn').onclick = handleDeleteAllFiles;
+                $('#delete-account-btn').onclick = handleDeleteAccount;
+                
+                setupDragDropAndSelection();
+            };
+
+            const handleItemClick = (event, itemId) => {
+                if(itemId < 0) return;
+                clearTimeout(mousePressTimer); 
+                if (event.ctrlKey || event.metaKey || event.shiftKey) {
+                    if (!isSelectionModeActive) enterSelectionMode();
+                    toggleSelection(itemId);
+                } else if (isSelectionModeActive) {
+                    toggleSelection(itemId);
+                }
+            };
+            const enterSelectionMode = () => {
+                isSelectionModeActive = true;
+                $('#default-header').classList.add('hidden');
+                $('#selection-header').classList.remove('hidden');
+                $('#file-browser').classList.add('selection-active');
+                updateSelectionUI();
+            };
+            const exitSelectionMode = () => {
+                isSelectionModeActive = false;
+                clearSelection();
+                $('#default-header').classList.remove('hidden');
+                $('#selection-header').classList.add('hidden');
+                $('#file-browser').classList.remove('selection-active');
+            };
+            const toggleSelection = (itemId) => {
+                if (selectedItems.has(itemId)) selectedItems.delete(itemId);
+                else selectedItems.add(itemId);
+                
+                if (!isSelectionModeActive && selectedItems.size > 0) {
+                    enterSelectionMode();
+                } else if (isSelectionModeActive && selectedItems.size === 0) {
+                    exitSelectionMode();
+                } else {
+                    updateSelectionUI();
+                }
+            };
+            const clearSelection = () => {
+                selectedItems.clear();
+                updateSelectionUI();
+            };
+            const updateSelectionUI = () => {
+                $$('.file-item, .list-item').forEach(el => {
+                    const id = parseInt(el.dataset.id);
+                    el.classList.toggle('selected', selectedItems.has(id));
+                });
+                if (isSelectionModeActive) {
+                    $('#selection-count').textContent = `${selectedItems.size} selected`;
+                }
+            };
+
+            const selectAllFiles = () => {
+                const allFileElements = $$('.file-item:not([data-id^="-"]), .list-item:not([data-id^="-"])');
+                if (allFileElements.length === 0) return;
+                enterSelectionMode();
+                allFileElements.forEach(el => selectedItems.add(parseInt(el.dataset.id)));
+                updateSelectionUI();
+            };
+
+            const handleDeleteAllFiles = () => {
+                const body = `<p class="text-sm text-red-400 mb-2">This action is irreversible. To confirm, please type your username and password below:</p>
+                    <input type="text" id="delete-confirm-input" class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus mb-2" placeholder="Username: ${currentUser}">
+                    <input type="password" id="delete-confirm-password" class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" placeholder="Password">`;
+                showConfirmModal({
+                    title: 'Delete All Files?', body, isDestructive: true, confirmText: 'Permanently Delete',
+                    onConfirm: async () => {
+                        const inputUser = $('#delete-confirm-input').value;
+                        const inputPass = $('#delete-confirm-password').value;
+                        if (inputUser !== currentUser) { showToast("Username does not match. Deletion cancelled."); return; }
+                        
+                        const user = await dbGet('users', currentUser);
+                        const hash = await hashPassword(inputPass, hexToBuffer(user.salt));
+                        if(hash !== user.passwordHash) { showToast("Incorrect password. Deletion cancelled."); return; }
+
+                        closeModal(); showLoader();
+                        const userFiles = await dbGetAll('files', 'by_user_parent', IDBKeyRange.bound([currentUser, -Infinity], [currentUser, Infinity]));
+                        const tx = db.transaction('files', 'readwrite');
+                        const store = tx.objectStore('files');
+                        userFiles.forEach(f => store.delete(f.id));
+                        await new Promise(r => tx.oncomplete = r);
+                        hideLoader();
+                        await renderFileSystem(currentFolderId);
+                        showToast("All your files have been deleted.");
+                    }
+                });
+            };
+
+            const handleDeleteAccount = () => {
+                const body = `<p class="text-sm text-red-400 mb-2">This will permanently delete your account and all associated data. To confirm, type your username and password.</p>
+                    <input type="text" id="delete-account-username" class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus mb-2" placeholder="Username: ${currentUser}">
+                    <input type="password" id="delete-account-password" class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus" placeholder="Password">`;
+                showConfirmModal({
+                    title: 'Delete This Account?', body, isDestructive: true, confirmText: 'Delete Forever',
+                    onConfirm: async () => {
+                         const inputUser = $('#delete-account-username').value;
+                        const inputPass = $('#delete-account-password').value;
+                        if (inputUser !== currentUser) { showToast("Username does not match."); return; }
+                        
+                        const user = await dbGet('users', currentUser);
+                        const hash = await hashPassword(inputPass, hexToBuffer(user.salt));
+                        if(hash !== user.passwordHash) { showToast("Incorrect password."); return; }
+
+                        closeModal(); showLoader();
+                        const tx = db.transaction(['users', 'settings', 'files'], 'readwrite');
+                        const stores = {
+                            users: tx.objectStore('users'),
+                            settings: tx.objectStore('settings'),
+                            files: tx.objectStore('files')
+                        };
+                        
+                        stores.users.delete(currentUser);
+                        stores.settings.delete(currentUser);
+                        
+                        const allFiles = await new Promise(r => stores.files.index('by_user_parent').getAll(IDBKeyRange.bound([currentUser, -Infinity], [currentUser, Infinity])).onsuccess = e => r(e.target.result));
+                        allFiles.forEach(f => stores.files.delete(f.id));
+
+                        await new Promise(r => tx.oncomplete = r);
+                        hideLoader();
+                        showToast("Account deleted successfully.");
+                        handleLogout();
+                    }
+                });
+            };
+            
+            const setupDragDropAndSelection = () => {
+                const fileBrowser = $('#file-browser');
+
+                fileBrowser.addEventListener('dragstart', e => {
+                    const target = e.target.closest('.file-item, .list-item');
+                    if (!target || parseInt(target.dataset.id) < 0) { e.preventDefault(); return; }
+                    
+                    const itemId = parseInt(target.dataset.id);
+                    let itemsToDrag;
+                    if (selectedItems.has(itemId)) {
+                        itemsToDrag = Array.from(selectedItems);
+                    } else {
+                        clearSelection();
+                        toggleSelection(itemId);
+                        itemsToDrag = [itemId];
+                    }
+                    e.dataTransfer.setData('application/json', JSON.stringify(itemsToDrag));
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                fileBrowser.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    const target = e.target.closest('.file-item, .list-item');
+                    $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                    if (target && target.dataset.type.includes('folder') && parseInt(target.dataset.id) >= 0) {
+                        target.classList.add('drag-over');
+                    }
+                });
+                
+                fileBrowser.addEventListener('dragleave', e => {
+                    e.target.closest('.file-item, .list-item')?.classList.remove('drag-over');
+                });
+                
+                fileBrowser.addEventListener('drop', e => {
+                    e.preventDefault();
+                    $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                    const target = e.target.closest('.file-item, .list-item');
+                    if (target && target.dataset.type.includes('folder') && parseInt(target.dataset.id) >= 0) {
+                        const targetFolderId = parseInt(target.dataset.id);
+                        const itemIds = JSON.parse(e.dataTransfer.getData('application/json'));
+                        if (!itemIds.includes(targetFolderId)) {
+                            moveItems(itemIds, targetFolderId);
+                        }
+                    }
+                });
+
+                window.addEventListener('keydown', e => {
+                    if (!currentUser || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+                    
+                    if (e.ctrlKey || e.metaKey) {
+                        switch(e.key.toLowerCase()){
+                            case 'a': e.preventDefault(); selectAllFiles(); break;
+                            case 'c': e.preventDefault(); copyItems(); break;
+                            case 'v': e.preventDefault(); pasteItems(); break;
+                            case 'u': e.preventDefault(); showUploadModal(); break;
+                            case 'n': e.preventDefault(); showNewFileModal('text/plain', 'new_document.txt'); break;
+                        }
+                    }
+                });
+            };
+
+            try { await initDB(); setupEventListeners(); await renderAuthScreen(); } 
+            catch (error) { console.error("Failed to initialize:", error); document.body.innerHTML = `<div class="h-screen w-screen flex items-center justify-center text-red-500 text-center p-4"><h1>Fatal Error</h1><p>Could not initialize the database. ${error}</p></div>`; }
+        })();
+    </script>
+</body>
+</html>
