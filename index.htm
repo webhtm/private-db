@@ -1387,36 +1387,38 @@
 
             const showUploadModal = () => renderGenericModal({ id: 'upload-modal', title: 'Upload', confirmText: 'Close', hideCancel: true, formBody: `<div class="flex flex-col gap-3"><button type="button" id="upload-files-btn" class="w-full p-3 bg-tertiary bg-tertiary-hover rounded-md text-center">Upload File(s)</button><button type="button" id="upload-folder-btn" class="w-full p-3 bg-tertiary bg-tertiary-hover rounded-md text-center">Upload Folder</button></div>`, onSubmit: closeModal });
             
-            const showPropertiesModal = async (itemId) => { 
-                const item = await dbGet('files', itemId); 
-                if (!item) return; 
-                let folderColorEditor = '';
-                if (item.type.includes('folder')) {
-                    folderColorEditor = `
-                        <div class="flex items-center gap-4 pt-2">
-                            <label class="font-semibold">Color:</label>
-                            <input type="color" id="properties-color-input" value="${item.color || '#3b82f6'}">
-                        </div>`;
+            const showPropertiesModal = async (itemId) => {
+    const item = await dbGet('files', itemId);
+    if (!item) return;
+    let folderColorEditor = '';
+    if (item.type.includes('folder')) {
+        folderColorEditor = `
+            <div class="flex items-center gap-4 pt-2">
+                <label class="font-semibold">Color:</label>
+                <input type="color" id="properties-color-input" value="${item.color || '#3b82f6'}">
+            </div>`;
+    }
+    let content = `<div class="space-y-2 text-sm text-primary"><p><strong>Name:</strong> ${item.name}</p><p><strong>Type:</strong> ${item.type.includes('folder') ? 'Folder' : item.type}</p>${item.size ? `<p><strong>Size:</strong> ${formatBytes(item.size)}</p>` : ''}<p><strong>Encrypted:</strong> ${item.iv ? 'Yes' : 'No'}</p><p><strong>Created:</strong> ${new Date(item.createdAt).toLocaleString()}</p><p><strong>Modified:</strong> ${new Date(item.updatedAt).toLocaleString()}</p>${folderColorEditor}</div>`;
+    
+    renderGenericModal({
+        id: 'properties-modal',
+        title: 'Properties',
+        body: content,
+        confirmText: 'Close', // This ensures the button always says "Close"
+        hideCancel: true,      // This hides the separate "Cancel" button
+        onSubmit: async () => {
+            if (item.type.includes('folder')) {
+                const newColor = $('#properties-color-input').value;
+                if (newColor !== (item.color || '#3b82f6')) {
+                    item.color = newColor;
+                    await dbPut('files', item);
+                    await renderFileSystem(currentFolderId);
                 }
-                let content = `<div class="space-y-2 text-sm text-primary"><p><strong>Name:</strong> ${item.name}</p><p><strong>Type:</strong> ${item.type.includes('folder') ? 'Folder' : item.type}</p>${item.size ? `<p><strong>Size:</strong> ${formatBytes(item.size)}</p>` : ''}<p><strong>Encrypted:</strong> ${item.iv ? 'Yes' : 'No'}</p><p><strong>Created:</strong> ${new Date(item.createdAt).toLocaleString()}</p><p><strong>Modified:</strong> ${new Date(item.updatedAt).toLocaleString()}</p>${folderColorEditor}</div>`; 
-                renderGenericModal({ 
-                    id: 'properties-modal', 
-                    title: 'Properties', 
-                    confirmText: item.type.includes('folder') ? 'Save' : 'Close', 
-                    body: content, 
-                    onSubmit: async () => {
-                        if (item.type.includes('folder')) {
-                            const newColor = $('#properties-color-input').value;
-                            if (newColor !== item.color) {
-                                item.color = newColor;
-                                await dbPut('files', item);
-                                await renderFileSystem(currentFolderId);
-                            }
-                        }
-                        closeModal();
-                    }
-                }); 
-            };
+            }
+            closeModal();
+        }
+    });
+};
             const showMoveModal = async () => { 
                 const folders = await dbGetAll('files', 'by_user_parent', IDBKeyRange.bound([currentUser, -Infinity], [currentUser, Infinity]));
                 const actualFolders = folders.filter(f => f.type === 'folder' && !selectedItems.has(f.id));
