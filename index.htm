@@ -321,7 +321,13 @@
                 const swBlob = new Blob([swCode], { type: 'application/javascript' });
                 navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.error('Service Worker registration failed:', err));
             }
-
+            const closeFileViewer = () => {
+                const viewer = $('#fullscreen-viewer');
+                viewer.classList.add('hidden');
+                // By clearing the HTML, we remove the video/audio/iframe elements,
+                // which automatically stops their playback or execution.
+                viewer.innerHTML = '';
+            };
             const showToast = (message) => { $('#toast-message').textContent = message; const t = $('#toast'); t.classList.remove('opacity-0','translate-y-2'); setTimeout(()=>t.classList.add('opacity-0','translate-y-2'), 3000); };
             const showLoader = () => $('#loading-overlay').classList.remove('hidden');
             const hideLoader = () => $('#loading-overlay').classList.add('hidden');
@@ -654,7 +660,7 @@
                 closeBtn.className = 'p-2 rounded-full bg-tertiary-hover';
                 closeBtn.title = 'Close';
                 closeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-                closeBtn.onclick = () => viewer.classList.add('hidden');
+                closeBtn.onclick = closeFileViewer;
                 
                 const contentArea = document.createElement('main');
                 contentArea.className = 'flex-grow p-4 overflow-auto flex items-center justify-center';
@@ -738,7 +744,7 @@
 
                 controls.appendChild(closeBtn);
                 viewer.append(header, contentArea);
-                viewer.addEventListener('close', () => URL.revokeObjectURL(url), { once: true });
+                
             };
 
             const downloadFile = async (fileId) => {
@@ -884,12 +890,20 @@
             };
 
             const deleteItems = async () => {
-                const numItems = selectedItems.size;
+                const itemsToDeleteSnapshot = new Set(selectedItems);
+                const numItems = itemsToDeleteSnapshot.size;
+
                 if (numItems === 0) return;
 
-                const itemId = selectedItems.values().next().value;
-                const item = await dbGet('files', itemId);
-                const isSingleFolder = item && item.type.includes('folder') && numItems === 1;
+                // Check if the selection is a single folder to customize the title
+                let isSingleFolder = false;
+                if (numItems === 1) {
+                    const singleItemId = itemsToDeleteSnapshot.values().next().value;
+                    const item = await dbGet('files', singleItemId);
+                    if (item && item.type.includes('folder')) {
+                        isSingleFolder = true;
+                    }
+                }
 
                 const title = isSingleFolder ? "Delete this folder?" : `Delete ${numItems} item(s)?`;
                 const body = `This will permanently delete the selected item(s) and all their contents. This action cannot be undone.`;
@@ -899,14 +913,15 @@
                     body,
                     isDestructive: true,
                     onConfirm: async () => {
-                        closeModal(); // <-- FIX: This line closes the modal immediately
+                        closeModal();
                         showLoader();
                         const tx = db.transaction('files', 'readwrite');
                         const store = tx.objectStore('files');
 
-                        const toDelete = new Set(selectedItems);
+                        // Use the snapshot of items, not the live selection
+                        const toDelete = new Set(itemsToDeleteSnapshot);
 
-                        for (const id of selectedItems) {
+                        for (const id of itemsToDeleteSnapshot) {
                             const file = await new Promise(r => store.get(id).onsuccess = e => r(e.target.result));
                             if (file && file.type.includes('folder')) {
                                 const descendants = await getAllDescendants(id, tx);
@@ -1489,7 +1504,7 @@
                 $('#password-form').onsubmit = handleLogin;
                 $('#signup-form').onsubmit = handleSignup;
                 $$('.modal-cancel-btn').forEach(btn => btn.onclick = closeModal);
-                modalBackdrop.onclick = () => { closeModal(); $('#fullscreen-viewer').classList.add('hidden'); closeSettings(); };
+                modalBackdrop.onclick = () => { closeModal(); closeFileViewer(); closeSettings(); };
                 $('#settings-btn').onclick = prepareSettingsPanel;
                 $('#settings-close-btn').onclick = closeSettings;
                 $('#settings-close-btn-mobile').onclick = closeSettings;
