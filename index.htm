@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -977,7 +976,8 @@
             const showContextMenu = async (x, y, anchor) => {
                 contextMenuJustOpened = true;
                 const menu = $('#context-menu');
-                menu.innerHTML = ''; let options = [];
+                menu.innerHTML = ''; 
+                let options = [];
                 const numSelected = selectedItems.size;
                 const totalItemsInView = $$('.file-item:not([data-id^="-"])').length;
 
@@ -992,7 +992,7 @@
                     },
                     disabled: totalItemsInView === 0
                 };
-                
+                                
                 if (numSelected > 0) {
                     options.push({ label: 'Copy', action: copyItems });
                 }
@@ -1020,25 +1020,37 @@
                     }
                     options.push({ label: `Delete ${numSelected} Items`, action: deleteItems, isDestructive: true });
                 } else {
+                    // This is the section for when no files are selected (like the 'More Options' button)
                     if (currentFolderId >= 0) {
                         options.push({ label: 'Paste', action: pasteItems, disabled: clipboard.items.size === 0 });
                         options.push({ label: 'New Folder', action: showNewFolderModal });
                         options.push({ label: 'New Text File', action: () => showNewFileModal('text/plain', 'new_document.txt') });
                         options.push({ label: 'New HTML File', action: () => showNewFileModal('text/html', 'new_page.html') });
                         options.push({ label: 'Upload', action: showUploadModal });
+                        options.push({ type: 'divider' }); // Optional divider for visual separation
+                        // Add Settings and Logout for mobile view (md:hidden hides them on medium screens and up)
+                        options.push({ label: 'Settings', action: prepareSettingsPanel, className: 'md:hidden flex items-center gap-2' });
+                        options.push({ label: 'Logout', action: handleLogout, isDestructive: true, className: 'md:hidden flex items-center gap-2' });
                     }
                 }
                 
                 options.push(selectAllOption);
-                
-                options.forEach(opt => { 
-                    const el = document.createElement('div'); 
-                    el.textContent = opt.label; 
-                    el.className = `px-4 py-2 bg-tertiary-hover ${opt.disabled ? 'cursor-not-allowed text-secondary' : 'cursor-pointer'} ${opt.isDestructive ? 'text-red-400' : 'text-primary'}`; 
-                    if(!opt.disabled) el.onclick = () => { opt.action(); hideContextMenu(); }; 
-                    menu.appendChild(el); 
-                });
-                
+
+                options.forEach(opt => {
+                     if (opt.type === 'divider') {
+                        const hr = document.createElement('hr');
+                        hr.className = 'border-primary my-1';
+                        menu.appendChild(hr);
+                        return;
+                     }
+                     const el = document.createElement('div');
+                     el.textContent = opt.label;
+                     // Added opt.className to allow for custom classes like 'md:hidden'
+                     el.className = `px-4 py-2 bg-tertiary-hover ${opt.disabled ? 'cursor-not-allowed text-secondary' : 'cursor-pointer'} ${opt.isDestructive ? 'text-red-400' : 'text-primary'} ${opt.className || ''}`;
+                     if(!opt.disabled) el.onclick = () => { opt.action(); hideContextMenu(); };
+                     menu.appendChild(el);
+                 });
+                                
                 menu.classList.remove('hidden');
                 const { offsetWidth: menuWidth, offsetHeight: menuHeight } = menu;
                 let newX = (anchor === 'anchor-right' || (x + menuWidth > window.innerWidth)) ? x - menuWidth : x;
