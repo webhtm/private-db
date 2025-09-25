@@ -52,7 +52,7 @@
         .file-item.drag-over, .list-item.drag-over {
             border-style: dashed !important;
             border-color: var(--accent-primary) !important;
-            transform: scale(1.03);
+            
         }
 
         #auth-screen-content {
@@ -128,7 +128,7 @@
             transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
         }
         .user-profile-button:hover {
-            transform: scale(1.03);
+            
             background-color: var(--bg-tertiary);
         }
         .truncate-username {
@@ -159,6 +159,10 @@
         }
         #loading-overlay {
     background-color: #333;
+}
+#move-modal .folder-item.selected {
+    background-color: var(--accent-primary);
+    color: white;
 }
     </style>
 </head>
@@ -213,7 +217,7 @@
                     </div>
                 </div>
             </header>
-            <main class="flex-grow flex bg-secondary rounded-lg p-4 overflow-hidden"><div id="file-browser" class="w-full h-full overflow-y-auto"><div id="file-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4"></div><div id="file-list" class="hidden"><div class="grid grid-cols-12 gap-4 px-4 py-2 text-secondary text-sm font-semibold border-b border-primary"><div class="col-span-6">Name</div><div class="col-span-3">Last Modified</div><div class="col-span-3">File Size</div></div><div id="list-items-container"></div></div><div id="empty-folder-message" class="hidden h-full flex items-center justify-center"><div class="text-center text-secondary"><svg class="mx-auto h-16 w-16" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg><p class="mt-2 text-lg font-semibold text-primary">This folder is empty</p><p class="text-sm">Use the '+' button or right-click to add items.</p></div></div></div></main>
+            <main class="flex-grow flex bg-secondary rounded-lg p-4 overflow-hidden"><div id="file-browser" class="w-full h-full overflow-y-auto"><div id="file-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4"></div><div id="file-list" class="hidden"><div class="grid grid-cols-12 gap-4 px-4 py-2 text-secondary text-sm font-semibold border-b border-primary"><div class="col-span-6">Name</div><div class="col-span-3">Last Modified</div><div class="col-span-3">File Size</div></div><div id="list-items-container"></div></div><div id="empty-folder-message" class="hidden h-full flex items-center justify-center"><div class="text-center text-secondary"><svg class="mx-auto h-16 w-16" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg><p class="mt-2 text-lg font-semibold text-primary">This folder is empty</p></div></div></div></main>
         </div>
     </div>
     
@@ -878,7 +882,7 @@
                 } catch (e) {
                     showToast('Upload error.');
                 } finally {
-                    await renderFileSystem(currentFolderId);
+                    navigateToFolder(newParentId);
                     progressContainer.remove();
                 }
             };
@@ -998,37 +1002,41 @@
                 });
             };
 
-            const moveItems = async (itemIds, newParentId) => { 
-                showLoader(); 
-                for (const itemId of itemIds) { 
-                    if(itemId === newParentId) continue;
-                    const item = await dbGet('files', itemId); 
-                    if (item) { 
-                        let parent = newParentId;
-                        let isDescendant = false;
-                        while(parent !== 0) {
-                            if (parent === itemId) {
-                                isDescendant = true;
-                                break;
-                            }
-                            const parentItem = await dbGet('files', parent);
-                            parent = parentItem ? parentItem.parentId : 0;
-                        }
-                        if (isDescendant) {
-                            showToast("Cannot move a folder into itself or a subfolder.");
-                            continue;
-                        }
+            
+            
+            const moveItems = async (itemIds, newParentId) => {
+    showLoader();
+    console.log('moveItems was called with:', itemIds)
+    for (const itemId of itemIds) {
+        if (itemId === newParentId) continue; // Prevent moving a folder into itself
+        const item = await dbGet('files', itemId);
+        if (item) {
+            // Check to prevent moving a parent folder into one of its own children
+            let parent = newParentId;
+            let isDescendant = false;
+            while (parent !== 0) {
+                if (parent === itemId) {
+                    isDescendant = true;
+                    break;
+                }
+                const parentItem = await dbGet('files', parent);
+                parent = parentItem ? parentItem.parentId : 0;
+            }
+            if (isDescendant) {
+                showToast(`Cannot move folder "${item.name}" into one of its own subfolders.`);
+                continue; // Skip this item and move to the next
+            }
 
-                        item.parentId = newParentId; 
-                        item.updatedAt = new Date(); 
-                        await dbPut('files', item); 
-                    } 
-                } 
-                await renderFileSystem(currentFolderId); 
-                showToast(`${itemIds.length} item(s) moved.`); 
-                closeModal(); 
-                hideLoader(); 
-            };
+            item.parentId = newParentId;
+            item.updatedAt = new Date();
+            await dbPut('files', item);
+        }
+    }
+    navigateToFolder(newParentId);
+    showToast(`${itemIds.length} item(s) moved.`);
+    closeModal();
+    hideLoader();
+};
 
             const renameItems = async (newName) => { 
                 if (!newName || selectedItems.size !== 1) return; 
@@ -1044,93 +1052,93 @@
                 } 
             };
 
-            const hideContextMenu = () => $('#context-menu').classList.add('hidden');
-
+                                
             const showContextMenu = async (x, y, anchor) => {
-                contextMenuJustOpened = true;
-                const menu = $('#context-menu');
-                menu.innerHTML = ''; 
-                let options = [];
-                const numSelected = selectedItems.size;
-                const totalItemsInView = $$('.file-item:not([data-id^="-"])').length;
+                contextMenuJustOpened = true;
+                const menu = $('#context-menu');
+                menu.innerHTML = ''; 
+                let options = [];
+                const numSelected = selectedItems.size;
+                const totalItemsInView = $$('.file-item:not([data-id^="-"])').length;
 
-                const selectAllOption = {
-                    label: (numSelected === totalItemsInView && totalItemsInView > 0) ? 'Unselect All' : 'Select All',
-                    action: () => {
-                        if (numSelected === totalItemsInView && totalItemsInView > 0) {
-                            exitSelectionMode();
-                        } else {
-                            selectAllFiles();
-                        }
-                    },
-                    disabled: totalItemsInView === 0
-                };
-                                
-                if (numSelected > 0) {
-                    options.push({ label: 'Copy', action: copyItems });
-                }
+                const selectAllOption = {
+                    label: (numSelected === totalItemsInView && totalItemsInView > 0) ? 'Unselect All' : 'Select All',
+                    action: () => {
+                        if (numSelected === totalItemsInView && totalItemsInView > 0) {
+                            exitSelectionMode();
+                        } else {
+                            selectAllFiles();
+                        }
+                    },
+                    disabled: totalItemsInView === 0
+                };
+                                
+                if (numSelected > 0) {
+                    options.push({ label: 'Copy', action: copyItems });
+                }
 
-                if (numSelected === 1) {
-                    const itemId = selectedItems.values().next().value;
-                    const item = await dbGet('files', itemId);
-                    if (!item) return;
+                if (numSelected === 1) {
+                    const itemId = selectedItems.values().next().value;
+                    const item = await dbGet('files', itemId);
+                    if (!item) return;
 
-                    if (item.type.includes('folder')) {
-                        options.push({ label: 'Open', action: () => navigateToFolder(itemId) });
-                    } else {
-                        options.push({ label: 'Preview', action: () => openFile(itemId) });
-                        options.push({ label: 'Download', action: () => downloadFile(itemId) });
-                    }
-                    if (itemId > 0 && currentFolderId >= 0) {
-                        options.push({ label: 'Rename', action: () => showRenameModal(itemId, item.name) });
-                        options.push({ label: 'Move', action: () => showMoveModal() });
-                    }
-                    options.push({ label: 'Properties', action: () => showPropertiesModal(itemId) });
-                    options.push({ label: 'Delete', action: deleteItems, isDestructive: true });
-                } else if (numSelected > 1) {
-                    if (currentFolderId >= 0) {
-                        options.push({ label: 'Move', action: () => showMoveModal() });
-                    }
-                    options.push({ label: `Delete ${numSelected} Items`, action: deleteItems, isDestructive: true });
-                } else {
-                    // This is the section for when no files are selected (like the 'More Options' button)
-                    if (currentFolderId >= 0) {
-                        options.push({ label: 'Paste', action: pasteItems, disabled: clipboard.items.size === 0 });
-                        options.push({ label: 'New Folder', action: showNewFolderModal });
-                        options.push({ label: 'New Text File', action: () => showNewFileModal('text/plain', 'new_document.txt') });
-                        options.push({ label: 'New HTML File', action: () => showNewFileModal('text/html', 'new_page.html') });
-                        options.push({ label: 'Upload', action: showUploadModal });
-                        options.push({ type: 'divider' }); // Optional divider for visual separation
-                        // Add Settings and Logout for mobile view (md:hidden hides them on medium screens and up)
-                        options.push({ label: 'Settings', action: prepareSettingsPanel, className: 'md:hidden flex items-center gap-2' });
-                        options.push({ label: 'Logout', action: handleLogout, isDestructive: true, className: 'md:hidden flex items-center gap-2' });
-                    }
-                }
-                
-                options.push(selectAllOption);
+                    if (item.type.includes('folder')) {
+                        options.push({ label: 'Open', action: () => navigateToFolder(itemId) });
+                    } else {
+                        options.push({ label: 'Preview', action: () => openFile(itemId) });
+                        options.push({ label: 'Download', action: () => downloadFile(itemId) });
+                    }
+                    if (itemId > 0 && currentFolderId >= 0) {
+                        options.push({ label: 'Rename', action: () => showRenameModal(itemId, item.name) });
+                        options.push({ label: 'Move', action: () => showMoveModal() });
+                    }
+                    options.push({ label: 'Properties', action: () => showPropertiesModal(itemId) });
+                    options.push({ label: 'Delete', action: deleteItems, isDestructive: true });
+                } else if (numSelected > 1) {
+                    if (currentFolderId >= 0) {
+                        options.push({ label: 'Move', action: () => showMoveModal() });
+                    }
+                    options.push({ label: `Delete ${numSelected} Items`, action: deleteItems, isDestructive: true });
+                } else {
+                    // This is the section for when no files are selected (like the 'More Options' button)
+                    if (currentFolderId >= 0) {
+                        options.push({ label: 'Paste', action: pasteItems, disabled: clipboard.items.size === 0 });
+                        options.push({ label: 'New Folder', action: showNewFolderModal });
+                        options.push({ label: 'New Text File', action: () => showNewFileModal('text/plain', 'new_document.txt') });
+                        options.push({ label: 'New HTML File', action: () => showNewFileModal('text/html', 'new_page.html') });
+                        options.push({ label: 'Upload File(s)', action: () => $('#file-upload-input').click() });
+                        
+                        options.push({ type: 'divider' }); // Optional divider for visual separation
+                        // Add Settings and Logout for mobile view (md:hidden hides them on medium screens and up)
+                        options.push({ label: 'Settings', action: prepareSettingsPanel, className: 'md:hidden flex items-center gap-2' });
+                        options.push({ label: 'Logout', action: handleLogout, isDestructive: true, className: 'md:hidden flex items-center gap-2' });
+                    }
+                }
+                
+                options.push(selectAllOption);
 
-                options.forEach(opt => {
-                     if (opt.type === 'divider') {
-                        const hr = document.createElement('hr');
-                        hr.className = 'border-primary my-1';
-                        menu.appendChild(hr);
-                        return;
-                     }
-                     const el = document.createElement('div');
-                     el.textContent = opt.label;
-                     // Added opt.className to allow for custom classes like 'md:hidden'
-                     el.className = `px-4 py-2 bg-tertiary-hover ${opt.disabled ? 'cursor-not-allowed text-secondary' : 'cursor-pointer'} ${opt.isDestructive ? 'text-red-400' : 'text-primary'} ${opt.className || ''}`;
-                     if(!opt.disabled) el.onclick = () => { opt.action(); hideContextMenu(); };
-                     menu.appendChild(el);
-                 });
-                                
-                menu.classList.remove('hidden');
-                const { offsetWidth: menuWidth, offsetHeight: menuHeight } = menu;
-                let newX = (anchor === 'anchor-right' || (x + menuWidth > window.innerWidth)) ? x - menuWidth : x;
-                let newY = (y + menuHeight > window.innerHeight) ? y - menuHeight : y;
-                menu.style.left = `${Math.max(0, newX)}px`;
-                menu.style.top = `${Math.max(0, newY)}px`;
-            };
+                options.forEach(opt => {
+                     if (opt.type === 'divider') {
+                        const hr = document.createElement('hr');
+                        hr.className = 'border-primary my-1';
+                        menu.appendChild(hr);
+                        return;
+                     }
+                     const el = document.createElement('div');
+                     el.textContent = opt.label;
+                     // Added opt.className to allow for custom classes like 'md:hidden'
+                     el.className = `px-4 py-2 bg-tertiary-hover ${opt.disabled ? 'cursor-not-allowed text-secondary' : 'cursor-pointer'} ${opt.isDestructive ? 'text-red-400' : 'text-primary'} ${opt.className || ''}`;
+                     if(!opt.disabled) el.onclick = () => { opt.action(); hideContextMenu(); };
+                     menu.appendChild(el);
+                 });
+                                
+                menu.classList.remove('hidden');
+                const { offsetWidth: menuWidth, offsetHeight: menuHeight } = menu;
+                let newX = (anchor === 'anchor-right' || (x + menuWidth > window.innerWidth)) ? x - menuWidth : x;
+                let newY = (y + menuHeight > window.innerHeight) ? y - menuHeight : y;
+                menu.style.left = `${Math.max(0, newX)}px`;
+                menu.style.top = `${Math.max(0, newY)}px`;
+            };
 
             const renderGenericModal = (config) => {
     const modalHTML = `<div id="${config.id}" class="fixed inset-0 flex items-center justify-center modal"><div class="bg-secondary rounded-lg shadow-xl p-6 w-full ${config.size || 'max-w-sm'}"><h3 class="text-lg font-bold mb-4 text-primary">${config.title}</h3>${config.body ? `<div class="text-sm text-secondary mb-4">${config.body}</div>` : ''}<form id="${config.id}-form">${config.formBody || ''}<div class="mt-4 flex justify-end gap-2">${config.hideCancel ? '' : '<button type="button" class="modal-cancel-btn px-4 py-2 bg-tertiary bg-tertiary-hover rounded-md text-primary">Cancel</button>'}${config.hideConfirm ? '' : `<button type="submit" class="px-4 py-2 rounded-md ${config.isDestructive ? 'destructive-primary destructive-hover' : 'accent-primary accent-hover'}">${config.confirmText}</button>`}</div></form></div></div>`;
@@ -1385,7 +1393,7 @@
                 setTimeout(() => $('#modal-input').select(), 100);
             };
 
-            const showUploadModal = () => renderGenericModal({ id: 'upload-modal', title: 'Upload', confirmText: 'Close', hideCancel: true, formBody: `<div class="flex flex-col gap-3"><button type="button" id="upload-files-btn" class="w-full p-3 bg-tertiary bg-tertiary-hover rounded-md text-center">Upload File(s)</button><button type="button" id="upload-folder-btn" class="w-full p-3 bg-tertiary bg-tertiary-hover rounded-md text-center">Upload Folder</button></div>`, onSubmit: closeModal });
+            const showUploadModal = () => renderGenericModal({ id: 'upload-modal', title: 'Upload', confirmText: 'Close', hideCancel: true, formBody: `<div class="flex flex-col gap-3"><button type="button" id="upload-files-btn" class="w-full p-3 bg-tertiary bg-tertiary-hover rounded-md text-center">Upload File(s)</button></div>`, onSubmit: closeModal });
             
             const showPropertiesModal = async (itemId) => {
     const item = await dbGet('files', itemId);
@@ -1419,23 +1427,45 @@
         }
     });
 };
-            const showMoveModal = async () => { 
-                const folders = await dbGetAll('files', 'by_user_parent', IDBKeyRange.bound([currentUser, -Infinity], [currentUser, Infinity]));
-                const actualFolders = folders.filter(f => f.type === 'folder' && !selectedItems.has(f.id));
-                
-                let folderListHTML = '';
-                const buildList = (parentId, indent = 0) => {
-                    actualFolders.filter(f => f.parentId === parentId).forEach(f => {
-                        folderListHTML += `<div class="folder-item p-2 rounded-md hover:bg-tertiary-hover cursor-pointer" data-id="${f.id}" style="padding-left: ${1 + indent * 1.5}rem;">${f.name}</div>`;
-                        buildList(f.id, indent + 1);
-                    });
-                };
-                buildList(0);
-                const body = `<div class="space-y-2"><input type="search" id="move-search" placeholder="Search folders..." class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus"><div id="folder-list" class="max-h-60 overflow-y-auto border border-primary rounded-md p-1"><div class="folder-item p-2 rounded-md hover:bg-tertiary-hover cursor-pointer font-semibold" data-id="0">My Drive (Root)</div>${folderListHTML}</div></div>`;
-                renderGenericModal({id: 'move-modal', title: 'Move Item(s)', size: 'max-w-md', confirmText: 'Move', formBody: body, onSubmit: (e) => { const selectedFolder = $(`#move-modal .folder-item.selected`); if(selectedFolder) moveItems(Array.from(selectedItems), parseInt(selectedFolder.dataset.id)) }}); 
-                $('#move-search').oninput = e => { const term = e.target.value.toLowerCase(); $$('#move-modal .folder-item').forEach(f => f.classList.toggle('hidden', !f.textContent.toLowerCase().includes(term))); };
-                $$('#move-modal .folder-item').forEach(item => item.onclick = () => { $$('#move-modal .folder-item.selected').forEach(s => s.classList.remove('selected', 'bg-tertiary-active')); item.classList.add('selected', 'bg-tertiary-active'); });
-            };
+            
+
+const showMoveModal = async () => {
+    // This snapshot ensures we move exactly what is selected
+    const itemsToMove = Array.from(selectedItems);
+    if (itemsToMove.length === 0) return;
+
+    const allFiles = await dbGetAll('files');
+    const folders = allFiles.filter(f => f.userId === currentUser && f.type === 'folder' && !itemsToMove.includes(f.id));
+    
+    let folderListHTML = '';
+    const buildList = (parentId, indent = 0) => {
+        folders.filter(f => f.parentId === parentId).forEach(f => {
+            folderListHTML += `<div class="folder-item p-2 rounded-md hover:bg-tertiary-hover cursor-pointer" data-id="${f.id}" style="padding-left: ${1 + indent * 1.5}rem;">${f.name}</div>`;
+            buildList(f.id, indent + 1);
+        });
+    };
+    buildList(0);
+
+    const body = `<div class="space-y-2"><input type="search" id="move-search" placeholder="Search folders..." class="w-full bg-tertiary border border-primary rounded-md py-2 px-3 text-primary no-ring-on-focus"><div id="folder-list" class="max-h-60 overflow-y-auto border border-primary rounded-md p-1"><div class="folder-item p-2 rounded-md hover:bg-tertiary-hover cursor-pointer font-semibold" data-id="0">My Drive (Root)</div>${folderListHTML}</div></div>`;
+    
+    renderGenericModal({
+        id: 'move-modal',
+        title: `Move ${itemsToMove.length} Item(s)`,
+        size: 'max-w-md',
+        confirmText: 'Move',
+        formBody: body,
+        onSubmit: (e) => {
+            const selectedFolder = $(`#move-modal .folder-item.selected`);
+            if (selectedFolder) {
+                // Pass the array of all selected items to be moved
+                moveItems(itemsToMove, parseInt(selectedFolder.dataset.id));
+            }
+        }
+    });
+
+    $('#move-search').oninput = e => { const term = e.target.value.toLowerCase(); $$('#move-modal .folder-item').forEach(f => f.classList.toggle('hidden', !f.textContent.toLowerCase().includes(term))); };
+    $$('#move-modal .folder-item').forEach(item => item.onclick = () => { $$('#move-modal .folder-item.selected').forEach(s => s.classList.remove('selected', 'bg-tertiary-active')); item.classList.add('selected', 'bg-tertiary-active'); });
+};
 
             const copyItems = () => {
                 if (selectedItems.size === 0) return;
@@ -1759,66 +1789,102 @@
                 });
             };
             
+            
+
             const setupDragDropAndSelection = () => {
-                const fileBrowser = $('#file-browser');
+    const fileBrowser = $('#file-browser');
 
-                fileBrowser.addEventListener('dragstart', e => {
-                    const target = e.target.closest('.file-item, .list-item');
-                    if (!target || parseInt(target.dataset.id) < 0) { e.preventDefault(); return; }
-                    
-                    const itemId = parseInt(target.dataset.id);
-                    let itemsToDrag;
-                    if (selectedItems.has(itemId)) {
-                        itemsToDrag = Array.from(selectedItems);
-                    } else {
-                        clearSelection();
-                        toggleSelection(itemId);
-                        itemsToDrag = [itemId];
-                    }
-                    e.dataTransfer.setData('application/json', JSON.stringify(itemsToDrag));
-                    e.dataTransfer.effectAllowed = 'move';
-                });
+    fileBrowser.addEventListener('dragstart', e => {
+        const target = e.target.closest('.file-item, .list-item');
+        if (!target || parseInt(target.dataset.id) < 0) { e.preventDefault(); return; }
+        const itemId = parseInt(target.dataset.id);
+        let itemsToDrag;
+        if (selectedItems.has(itemId)) {
+            itemsToDrag = Array.from(selectedItems);
+        } else {
+            clearSelection();
+            toggleSelection(itemId);
+            itemsToDrag = [itemId];
+        }
+        e.dataTransfer.setData('application/json', JSON.stringify(itemsToDrag));
+        e.dataTransfer.effectAllowed = 'move';
+    });
 
-                fileBrowser.addEventListener('dragover', e => {
+    fileBrowser.addEventListener('dragover', e => {
+        e.preventDefault();
+        const target = e.target.closest('.file-item, .list-item');
+        $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        if (target && target.dataset.type.includes('folder') && parseInt(target.dataset.id) >= 0) {
+            target.classList.add('drag-over');
+        }
+    });
+
+    fileBrowser.addEventListener('dragleave', e => {
+        e.target.closest('.file-item, .list-item')?.classList.remove('drag-over');
+    });
+
+    fileBrowser.addEventListener('drop', e => {
+        e.preventDefault();
+        $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        const target = e.target.closest('.file-item, .list-item');
+        if (target && target.dataset.type.includes('folder') && parseInt(target.dataset.id) >= 0) {
+            const targetFolderId = parseInt(target.dataset.id);
+            const itemIds = JSON.parse(e.dataTransfer.getData('application/json'));
+            if (!itemIds.includes(targetFolderId)) {
+                moveItems(itemIds, targetFolderId);
+            }
+        }
+    });
+
+    window.addEventListener('keydown', e => {
+        // This check prevents shortcuts from firing while typing in an input, modal, or textarea
+        if (!currentUser || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+
+        // Handle Ctrl/Cmd shortcuts
+        if (e.ctrlKey || e.metaKey) {
+            switch (e.key.toLowerCase()) {
+                case 'a': e.preventDefault(); selectAllFiles(); break;
+                case 'c': e.preventDefault(); copyItems(); break;
+                case 'v': e.preventDefault(); pasteItems(); break;
+                case 'u': e.preventDefault(); showUploadModal(); break;
+                case 'n': e.preventDefault(); showNewFileModal('text/plain', 'new_document.txt'); break;
+            }
+            return; // Exit after handling Ctrl/Cmd shortcut
+        }
+
+        // Handle single-key shortcuts
+        if (selectedItems.size > 0) {
+            const singleSelectedId = selectedItems.size === 1 ? selectedItems.values().next().value : null;
+
+            switch (e.key) {
+                case 'Delete':
                     e.preventDefault();
-                    const target = e.target.closest('.file-item, .list-item');
-                    $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
-                    if (target && target.dataset.type.includes('folder') && parseInt(target.dataset.id) >= 0) {
-                        target.classList.add('drag-over');
-                    }
-                });
+                    deleteItems();
+                    break;
                 
-                fileBrowser.addEventListener('dragleave', e => {
-                    e.target.closest('.file-item, .list-item')?.classList.remove('drag-over');
-                });
-                
-                fileBrowser.addEventListener('drop', e => {
-                    e.preventDefault();
-                    $$('.drag-over').forEach(el => el.classList.remove('drag-over'));
-                    const target = e.target.closest('.file-item, .list-item');
-                    if (target && target.dataset.type.includes('folder') && parseInt(target.dataset.id) >= 0) {
-                        const targetFolderId = parseInt(target.dataset.id);
-                        const itemIds = JSON.parse(e.dataTransfer.getData('application/json'));
-                        if (!itemIds.includes(targetFolderId)) {
-                            moveItems(itemIds, targetFolderId);
+                case 'F2':
+                    if (singleSelectedId) {
+                        e.preventDefault();
+                        const itemElement = $(`[data-id="${singleSelectedId}"]`);
+                        if (itemElement) {
+                            showRenameModal(singleSelectedId, itemElement.dataset.name);
                         }
                     }
-                });
-
-                window.addEventListener('keydown', e => {
-                    if (!currentUser || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-                    
-                    if (e.ctrlKey || e.metaKey) {
-                        switch(e.key.toLowerCase()){
-                            case 'a': e.preventDefault(); selectAllFiles(); break;
-                            case 'c': e.preventDefault(); copyItems(); break;
-                            case 'v': e.preventDefault(); pasteItems(); break;
-                            case 'u': e.preventDefault(); showUploadModal(); break;
-                            case 'n': e.preventDefault(); showNewFileModal('text/plain', 'new_document.txt'); break;
+                    break;
+                
+                case 'Enter':
+                    if (singleSelectedId) {
+                        e.preventDefault();
+                        const itemElement = $(`[data-id="${singleSelectedId}"]`);
+                        if (itemElement) {
+                            itemElement.dataset.type.includes('folder') ? navigateToFolder(singleSelectedId) : openFile(singleSelectedId);
                         }
                     }
-                });
-            };
+                    break;
+            }
+        }
+    });
+};
 
             try { await initDB(); setupEventListeners(); await renderAuthScreen(); } 
             catch (error) { console.error("Failed to initialize:", error); document.body.innerHTML = `<div class="h-screen w-screen flex items-center justify-center text-red-500 text-center p-4"><h1>Fatal Error</h1><p>Could not initialize the database. ${error}</p></div>`; }
